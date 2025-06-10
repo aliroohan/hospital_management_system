@@ -1,229 +1,217 @@
 # 🏥 Hospital Management System
 
-A modern, feature-rich Hospital Management System built with **CustomTkinter** for an elegant and professional user interface, connected to a **Microsoft SQL Server** database.
+A comprehensive hospital management system built with Python and CustomTkinter, featuring role-based access control and modern UI design.
 
 ## ✨ Features
 
-### 🎨 Modern UI Design
-- **Dark/Light/System Theme Support** - Dynamic theme switching with CustomTkinter
-- **Responsive Layout** - Adaptive design that works on different screen sizes
-- **Professional Sidebar Navigation** - Clean, icon-based navigation menu
-- **Card-based Interface** - Modern card layouts with rounded corners and shadows
-- **Scrollable Tables** - Enhanced table views with sorting and search functionality
-- **Form Validation** - Real-time input validation with user feedback
-- **Beautiful Typography** - Custom fonts and professional styling
+### 🔐 Authentication System
+- User registration and login
+- Role-based access control (Admin, Patient, Appointment, Pharmacist)
+- Secure password hashing
 
-### 🏥 Core Functionality
-- **👥 Patient Management** - Complete patient registration, search, and record management
-- **👨‍⚕️ Doctor Management** - Doctor profiles, specialties, and department assignments
-- **📅 Appointment Scheduling** - Advanced appointment booking with conflict prevention
-- **🛏️ Bed Management** - Real-time bed availability tracking and room management
-- **🏥 Admission/Discharge** - Comprehensive patient admission and discharge workflows
-- **💰 Billing System** - Automated bill generation and payment tracking
-- **🔍 Advanced Search** - Search functionality across all modules
-- **📊 Data Sorting** - Multi-criteria sorting for all data tables
+### 👨‍💼 Admin Module
+- Dashboard with statistics
+- Doctor management (add, edit, delete)
+- Staff management
+- Room and bed management
+- Department management
+- Medical records oversight
+
+### 👤 Patient Module
+- Patient registration and management
+- Medical records management
+- Patient search functionality
+- Patient reports and statistics
+
+### 📅 Appointment Module
+- Appointment scheduling
+- Calendar view and management
+- Patient and doctor browser
+- Appointment status tracking
+- Today's schedule overview
+
+### 💊 Pharmacy Module
+- Medicine inventory management
+- Stock tracking and alerts
+- Prescription management
+- Expiry date monitoring
+- Billing integration
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- **Python 3.7+**
-- **Microsoft SQL Server** (Local or Remote)
-- **ODBC Driver 17 for SQL Server**
-- **pip** package manager
+- Python 3.7 or higher
+- SQL Server (LocalDB, Express, or Full version)
+- Windows OS (recommended for SQL Server integration)
 
 ### Installation
 
-1. **Clone the repository**
+1. **Clone or download** all the project files to a folder
+
+2. **Run the setup script:**
    ```bash
-   git clone <repository-url>
-   cd hospital-management-system
+   python setup.py
    ```
 
-2. **Install dependencies**
+3. **Ensure SQL Server is running** on your system
+
+4. **Start the application:**
    ```bash
-   pip install -r requirements.txt
+   python hospital_main.py
    ```
 
-3. **Database Setup**
-   - Ensure SQL Server is running
-   - Update connection settings in `db_connect.py` if needed
-   - The application will automatically create the database on first run
+### Manual Installation
 
-4. **Run the application**
-   ```bash
-   python main.py
-   ```
+If the setup script doesn't work, install dependencies manually:
 
-## 📦 Dependencies
-
-```txt
-customtkinter==5.2.0
-CTkTable==0.8
-pyodbc==4.0.39
-pillow==10.0.0
+```bash
+pip install customtkinter pyodbc CTkTable
 ```
 
-## 🗄️ Database Schema
+## 📊 Database Setup
 
-The system uses a comprehensive SQL Server database with the following tables:
-- **Patient** - Patient demographics and contact information
-- **Doctor** - Doctor profiles and specializations
-- **Department** - Hospital departments and organization
-- **Appointment** - Appointment scheduling and status tracking
-- **MedicalRecord** - Patient medical history and diagnoses
-- **Bill** - Billing and payment management
-- **Bed** - Bed inventory and availability
-- **Room** - Room management and capacity
-- **Admission** - Patient admission and discharge records
-- **Staff** - Hospital staff management
-- **AuditLog** - System activity logging
+The system automatically creates the database and tables on first run. The database connection settings are in `db_connect.py`:
 
-## 🎯 User Guide
+```python
+# Default connection string
+'DRIVER={ODBC Driver 17 for SQL Server};'
+'SERVER=localhost;'
+'DATABASE=Hospital;'
+'Trusted_Connection=yes;'
+```
 
-### Navigation
-The application features an intuitive sidebar with the following modules:
+### Modifying Database Connection
 
-- **🏥 HMS** - Application branding and home
-- **👥 Patients** - Patient registration and management
-- **👨‍⚕️ Doctors** - Doctor profiles and specialties
-- **📅 Appointments** - Appointment scheduling system
-- **🛏️ Beds** - Bed availability and room management
-- **🏥 Admissions** - Patient admission and discharge
-- **💰 Bills** - Billing and payment processing
+If you need to change database settings, edit the `connect_db()` function in `db_connect.py`:
 
-### Key Features
+```python
+def connect_db():
+    try:
+        return pyodbc.connect(
+            'DRIVER={ODBC Driver 17 for SQL Server};'
+            'SERVER=your_server_name;'  # Change this
+            'DATABASE=Hospital;'
+            'UID=your_username;'        # Add if needed
+            'PWD=your_password;'        # Add if needed
+        )
+```
 
-#### 👥 Patient Management
-- **Add New Patients** - Comprehensive registration form with validation
-- **Search Patients** - Real-time search across all patient fields
-- **Sort Options** - Sort by ID, name, or date of birth
-- **Data Validation** - Automatic validation for phone numbers and dates
-- **Responsive Table** - Modern table with hover effects and scrolling
+## 👥 User Roles & Permissions
 
-#### 📅 Appointment System
-- **Smart Scheduling** - Prevents double-booking and past appointments
-- **Search & Filter** - Find appointments by patient, doctor, or date
-- **Status Tracking** - Monitor appointment status (Scheduled/Completed/Cancelled)
-- **Auto-validation** - Ensures data integrity with real-time validation
+### 👨‍💼 Admin
+- Full system access
+- Manage doctors, staff, departments
+- Oversee all hospital operations
+- View comprehensive reports
 
-#### 🛏️ Bed Management
-- **Real-time Availability** - Live bed status tracking
-- **Room Integration** - Automatic room status updates
-- **Capacity Management** - Prevents overbooking with smart validation
-- **Multiple Room Types** - Support for General, ICU, and Private rooms
+### 👤 Patient Management
+- Register and manage patients
+- Handle medical records
+- Patient search and reports
 
-#### 🎨 Theme Customization
-Switch between **Light**, **Dark**, and **System** themes using the appearance mode selector in the sidebar.
+### 📅 Appointment Staff
+- Schedule appointments
+- Manage appointment calendar
+- Handle appointment conflicts
+- View daily schedules
 
-## 🛠️ Technical Architecture
-
-### Frontend
-- **CustomTkinter** - Modern Python GUI framework
-- **Responsive Grid Layout** - Flexible, adaptive interface design
-- **Component Architecture** - Modular, reusable UI components
-- **Event-driven Programming** - Efficient user interaction handling
-
-### Backend
-- **Microsoft SQL Server** - Enterprise-grade database system
-- **pyodbc** - High-performance database connectivity
-- **Stored Procedures** - Optimized database operations
-- **Transaction Management** - ACID-compliant data operations
-
-### Design Patterns
-- **MVC Architecture** - Clean separation of concerns
-- **Database Abstraction** - Centralized database operations
-- **Error Handling** - Comprehensive exception management
-- **Validation Layer** - Multi-level data validation
+### 💊 Pharmacist
+- Manage medicine inventory
+- Track stock levels
+- Handle prescriptions
+- Monitor expiry dates
 
 ## 🔧 Configuration
 
-### Database Connection
-Update connection settings in `db_connect.py`:
+### Theme Settings
+The application uses dark theme by default. You can change this in `hospital_main.py`:
+
 ```python
-def connect_db():
-    return pyodbc.connect(
-        'DRIVER={ODBC Driver 17 for SQL Server};'
-        'SERVER=localhost;'  # Update your server
-        'DATABASE=HospitalManagement;'
-        'Trusted_Connection=yes;'  # Or use username/password
-    )
+ctk.set_appearance_mode("light")  # "dark", "light", or "system"
+ctk.set_default_color_theme("blue")  # "blue", "green", or "dark-blue"
 ```
 
-### UI Customization
-Modify appearance in `main.py`:
+### Window Settings
+Modify window size and behavior in the `HospitalManagementSystem` class:
+
 ```python
-ctk.set_appearance_mode("dark")  # "light", "dark", "system"
-ctk.set_default_color_theme("blue")  # "blue", "green", "dark-blue"
+self.root.geometry("1600x1000")  # Width x Height
+self.root.resizable(True, True)   # Allow resizing
 ```
 
-## 🚨 Error Handling & Validation
+## 📁 File Structure
 
-The application includes comprehensive error handling:
-- **Database Connection Errors** - Graceful handling with user notifications
-- **Data Validation** - Real-time input validation with visual feedback
-- **Constraint Violations** - Intelligent handling of database constraints
-- **User Notifications** - Clear success and error messages with emojis
-- **Exception Logging** - Detailed error tracking for debugging
-
-## 🔮 Advanced Features
-
-- **Auto-database Creation** - Automatic database setup on first run
-- **Data Integrity** - Enforced relationships and constraints
-- **Audit Logging** - Track all system activities
-- **Trigger-based Logic** - Automated business rule enforcement
-- **Real-time Updates** - Live data synchronization across modules
-
-## 🔧 Development
-
-### Project Structure
 ```
-hospital-management-system/
-├── main.py              # Main application entry point
-├── db_connect.py        # Database connection and operations
-├── Hospital.sql         # Database schema and procedures
-├── requirements.txt     # Python dependencies
-└── README.md           # This file
+Hospital-Management-System/
+├── hospital_main.py              # Main application entry point
+├── auth_interface.py             # Authentication system
+├── admin_module.py               # Admin functionality
+├── patient_module.py             # Patient management
+├── appointment_module.py         # Appointment scheduling
+├── pharmacy_module.py            # Pharmacy management
+├── db_connect.py                 # Database operations
+├── HospitalManagementSystem_Corrected.sql  # Database schema
+├── setup.py                      # Setup script
+└── README.md                     # This file
 ```
-
-### Adding New Features
-1. Define database operations in `db_connect.py`
-2. Create UI components in `main.py`
-3. Add validation and error handling
-4. Update documentation
-
-## 🤝 Contributing
-
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/AmazingFeature`)
-3. **Commit** your changes (`git commit -m 'Add some AmazingFeature'`)
-4. **Push** to the branch (`git push origin feature/AmazingFeature`)
-5. **Open** a Pull Request
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
-1. **Database Connection Failed**
+1. **"No module named 'customtkinter'"**
+   ```bash
+   pip install customtkinter
+   ```
+
+2. **Database connection errors**
    - Ensure SQL Server is running
-   - Check ODBC Driver 17 installation
-   - Verify connection string in `db_connect.py`
+   - Check connection string in `db_connect.py`
+   - Install SQL Server ODBC Driver
 
-2. **Module Import Errors**
-   - Install all dependencies: `pip install -r requirements.txt`
-   - Check Python version (3.7+ required)
+3. **"pyodbc" installation issues**
+   - Install Microsoft Visual C++ Redistributable
+   - Try: `pip install pyodbc --upgrade`
 
-3. **UI Display Issues**
-   - Update CustomTkinter: `pip install --upgrade customtkinter`
-   - Check system theme compatibility
+4. **Application won't start**
+   - Check Python version (3.7+)
+   - Verify all files are present
+   - Run `python setup.py` again
 
-## 📄 License
+### SQL Server Setup Help
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+If you don't have SQL Server:
 
-## 👨‍💻 Developer Notes
+1. **Download SQL Server Express** (free) from Microsoft
+2. **Install with default settings**
+3. **Enable SQL Server Browser service**
+4. **Test connection** using SQL Server Management Studio
 
-Built with modern Python GUI technologies and enterprise-grade database systems for optimal performance and user experience. The application follows industry best practices for healthcare management systems with a focus on data security, user experience, and system reliability.
+## 🔄 Updates & Maintenance
+
+### Adding New Features
+- Follow the modular structure
+- Create new functions in appropriate modules
+- Update database schema if needed
+- Test with different user roles
+
+### Database Maintenance
+- Regular backups recommended
+- Monitor database size
+- Clean up old records as needed
+
+## 📞 Support
+
+For issues or questions:
+1. Check the troubleshooting section
+2. Verify all prerequisites are met
+3. Test with sample data
+4. Check database connectivity
+
+## 📝 License
+
+This project is for educational and internal use. Modify as needed for your specific requirements.
 
 ---
 
-**🚀 Ready to deploy!** The system is production-ready with comprehensive error handling, data validation, and a professional user interface designed for healthcare environments. 
+🏥 **Happy Hospital Management!** 🏥 

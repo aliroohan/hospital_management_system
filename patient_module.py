@@ -1,0 +1,696 @@
+import customtkinter as ctk
+from tkinter import messagebox
+from datetime import datetime
+import re
+from db_connect import *
+from CTkTable import *
+
+class PatientModule:
+    def __init__(self, main_frame, user_info):
+        self.main_frame = main_frame
+        self.user_info = user_info
+        self.current_view = None
+        
+        self.setup_patient_interface()
+    
+    def setup_patient_interface(self):
+        # Clear main frame
+        for widget in self.main_frame.winfo_children():
+            widget.destroy()
+        
+        # Configure main frame
+        self.main_frame.grid_columnconfigure(1, weight=1)
+        self.main_frame.grid_rowconfigure(0, weight=1)
+        
+        # Create sidebar
+        self.sidebar_frame = ctk.CTkFrame(self.main_frame, width=250, corner_radius=0)
+        self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
+        self.sidebar_frame.grid_rowconfigure(6, weight=1)
+        
+        # Create content area
+        self.content_frame = ctk.CTkScrollableFrame(self.main_frame)
+        self.content_frame.grid(row=0, column=1, sticky="nsew", padx=(20, 20), pady=(20, 20))
+        
+        self.setup_sidebar()
+        self.show_dashboard()
+    
+    def setup_sidebar(self):
+        # Patient header
+        header_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        header_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 10))
+        
+        ctk.CTkLabel(header_frame, text="👤 PATIENT", font=ctk.CTkFont(size=24, weight="bold")).pack()
+        ctk.CTkLabel(header_frame, text=f"Welcome, {self.user_info['username']}", 
+                     font=ctk.CTkFont(size=12)).pack(pady=(5, 0))
+        
+        # Navigation buttons
+        buttons = [
+            ("📊 Dashboard", self.show_dashboard),
+            ("👥 Manage Patients", self.show_patient_management),
+            ("📋 Medical Records", self.show_medical_records),
+            ("🔍 Search Patients", self.show_patient_search),
+            ("📄 Patient Reports", self.show_patient_reports),
+        ]
+        
+        for i, (text, command) in enumerate(buttons, 1):
+            btn = ctk.CTkButton(self.sidebar_frame, text=text, command=command,
+                               height=40, font=ctk.CTkFont(size=14))
+            btn.grid(row=i, column=0, padx=20, pady=5, sticky="ew")
+    
+    def clear_content(self):
+        for widget in self.content_frame.winfo_children():
+            widget.destroy()
+    
+    def validate_phone(self, phone):
+        return bool(re.match(r'^\d{10}$', phone))
+    
+    def validate_date(self, date_str):
+        try:
+            datetime.strptime(date_str, '%Y-%m-%d')
+            return True
+        except ValueError:
+            return False
+    
+    def validate_email(self, email):
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return bool(re.match(pattern, email))
+    
+    def show_dashboard(self):
+        self.clear_content()
+        
+        # Dashboard title
+        title = ctk.CTkLabel(self.content_frame, text="📊 Patient Dashboard", 
+                            font=ctk.CTkFont(size=28, weight="bold"))
+        title.pack(pady=(0, 30))
+        
+        # Stats container
+        stats_frame = ctk.CTkFrame(self.content_frame)
+        stats_frame.pack(fill="x", padx=20, pady=10)
+        stats_frame.grid_columnconfigure((0, 1, 2), weight=1)
+        
+        # Sample stats cards
+        stats = [
+            ("👥 Total Patients", "156", "#3498db"),
+            ("📋 Medical Records", "342", "#e74c3c"),
+            ("🆕 New This Month", "28", "#27ae60")
+        ]
+        
+        for i, (title, count, color) in enumerate(stats):
+            card = ctk.CTkFrame(stats_frame, fg_color=color)
+            card.grid(row=0, column=i, padx=10, pady=20, sticky="ew")
+            
+            ctk.CTkLabel(card, text=count, font=ctk.CTkFont(size=36, weight="bold"), 
+                        text_color="white").pack(pady=(20, 5))
+            ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=14), 
+                        text_color="white").pack(pady=(0, 20))
+        
+        # Quick actions
+        actions_frame = ctk.CTkFrame(self.content_frame)
+        actions_frame.pack(fill="x", padx=20, pady=20)
+        
+        ctk.CTkLabel(actions_frame, text="Quick Actions", 
+                     font=ctk.CTkFont(size=20, weight="bold")).pack(pady=20)
+        
+        quick_buttons = ctk.CTkFrame(actions_frame, fg_color="transparent")
+        quick_buttons.pack(pady=10)
+        
+        ctk.CTkButton(quick_buttons, text="➕ Register New Patient", 
+                     command=self.show_patient_management).pack(side="left", padx=10)
+        ctk.CTkButton(quick_buttons, text="📋 Add Medical Record", 
+                     command=self.show_medical_records).pack(side="left", padx=10)
+        ctk.CTkButton(quick_buttons, text="🔍 Search Patient", 
+                     command=self.show_patient_search).pack(side="left", padx=10)
+        
+        # Recent activity
+        recent_frame = ctk.CTkFrame(self.content_frame)
+        recent_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        ctk.CTkLabel(recent_frame, text="Recent Patient Activity", 
+                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
+        
+        # Sample recent activity
+        activity_items = [
+            "👤 John Doe - Registered today",
+            "📋 Jane Smith - Medical record updated",
+            "🔄 Mike Johnson - Information updated",
+            "👤 Sarah Wilson - New patient registered"
+        ]
+        
+        for item in activity_items:
+            item_frame = ctk.CTkFrame(recent_frame, fg_color="transparent")
+            item_frame.pack(fill="x", padx=20, pady=5)
+            ctk.CTkLabel(item_frame, text=item, font=ctk.CTkFont(size=14)).pack(anchor="w")
+    
+    def show_patient_management(self):
+        self.clear_content()
+        
+        # Title
+        title = ctk.CTkLabel(self.content_frame, text="👥 Patient Management", 
+                            font=ctk.CTkFont(size=28, weight="bold"))
+        title.pack(pady=(0, 20))
+        
+        # Content container
+        content_container = ctk.CTkFrame(self.content_frame)
+        content_container.pack(fill="both", expand=True, padx=20)
+        content_container.grid_columnconfigure(1, weight=2)
+        content_container.grid_rowconfigure(0, weight=1)
+        
+        # Form section
+        form_frame = ctk.CTkFrame(content_container)
+        form_frame.grid(row=0, column=0, sticky="nsew", padx=(20, 10), pady=20)
+        form_frame.grid_columnconfigure(1, weight=1)
+        
+        ctk.CTkLabel(form_frame, text="Register New Patient", 
+                     font=ctk.CTkFont(size=18, weight="bold")).grid(row=0, column=0, columnspan=2, pady=15)
+        
+        # Form fields
+        fields = [
+            ("First Name:", "patient_fname"),
+            ("Last Name:", "patient_lname"),
+            ("Date of Birth:", "patient_dob"),
+            ("Gender:", "patient_gender"),
+            ("Contact Number:", "patient_contact"),
+            ("Email:", "patient_email"),
+            ("Address:", "patient_address"),
+            ("Insurance ID:", "patient_insurance")
+        ]
+        
+        self.patient_entries = {}
+        for i, (label, key) in enumerate(fields, 1):
+            ctk.CTkLabel(form_frame, text=label).grid(row=i, column=0, padx=(20, 5), pady=5, sticky="w")
+            
+            if key == "patient_gender":
+                entry = ctk.CTkOptionMenu(form_frame, values=["M", "F"], height=35)
+            elif key == "patient_dob":
+                entry = ctk.CTkEntry(form_frame, placeholder_text="YYYY-MM-DD", height=35)
+            else:
+                entry = ctk.CTkEntry(form_frame, height=35)
+            
+            entry.grid(row=i, column=1, padx=(5, 20), pady=5, sticky="ew")
+            self.patient_entries[key] = entry
+        
+        # Add button
+        ctk.CTkButton(form_frame, text="➕ Register Patient", command=self.register_patient,
+                     height=40).grid(row=len(fields)+1, column=0, columnspan=2, padx=20, pady=20, sticky="ew")
+        
+        # Table section
+        table_frame = ctk.CTkFrame(content_container)
+        table_frame.grid(row=0, column=1, sticky="nsew", padx=(10, 20), pady=20)
+        table_frame.grid_columnconfigure(0, weight=1)
+        table_frame.grid_rowconfigure(1, weight=1)
+        
+        # Table header
+        header = ctk.CTkFrame(table_frame)
+        header.grid(row=0, column=0, sticky="ew", padx=20, pady=(15, 5))
+        header.grid_columnconfigure(0, weight=1)
+        
+        ctk.CTkLabel(header, text="Patient List", 
+                     font=ctk.CTkFont(size=18, weight="bold")).grid(row=0, column=0, sticky="w")
+        ctk.CTkButton(header, text="🔄 Refresh", command=self.load_patients,
+                     width=100, height=30).grid(row=0, column=1)
+        
+        # Scrollable table
+        self.patient_table_scroll = ctk.CTkScrollableFrame(table_frame)
+        self.patient_table_scroll.grid(row=1, column=0, sticky="nsew", padx=20, pady=(5, 20))
+        
+        self.load_patients()
+    
+    def register_patient(self):
+        entries = self.patient_entries
+        try:
+            first_name = entries['patient_fname'].get()
+            last_name = entries['patient_lname'].get()
+            dob = entries['patient_dob'].get()
+            gender = entries['patient_gender'].get()
+            contact = entries['patient_contact'].get()
+            email = entries['patient_email'].get()
+            address = entries['patient_address'].get()
+            insurance_id = entries['patient_insurance'].get()
+            
+            # Validation
+            if not all([first_name, last_name, dob, gender, contact]):
+                messagebox.showerror("Error", "Please fill all required fields")
+                return
+            
+            if not self.validate_date(dob):
+                messagebox.showerror("Error", "Invalid date format (YYYY-MM-DD)")
+                return
+            
+            if not self.validate_phone(contact):
+                messagebox.showerror("Error", "Contact number must be 10 digits")
+                return
+            
+            if email and not self.validate_email(email):
+                messagebox.showerror("Error", "Invalid email format")
+                return
+            
+            conn = connect_db()
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO Patient (first_name, last_name, dob, gender, contact_number, email, address, insurance_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (first_name, last_name, dob, gender, contact, email or None, address, 
+                     int(insurance_id) if insurance_id else None))
+                conn.commit()
+                
+                messagebox.showinfo("Success", "Patient registered successfully!")
+                
+                # Clear form
+                for key, entry in entries.items():
+                    if hasattr(entry, 'delete'):
+                        entry.delete(0, 'end')
+                    else:  # For OptionMenu
+                        entry.set("M")
+                
+                self.load_patients()
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to register patient: {e}")
+        finally:
+            if conn:
+                cursor.close()
+                conn.close()
+    
+    def load_patients(self):
+        try:
+            # Clear existing content
+            for widget in self.patient_table_scroll.winfo_children():
+                widget.destroy()
+            
+            conn = connect_db()
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT p.patient_id, p.first_name, p.last_name, p.dob, p.gender, 
+                           p.contact_number, p.email, i.company_name as insurance_company
+                    FROM Patient p
+                    LEFT JOIN Insurance i ON p.insurance_id = i.insurance_id
+                """)
+                patients = cursor.fetchall()
+                
+                # Create header
+                columns = ["ID", "First Name", "Last Name", "DOB", "Gender", "Contact", "Email", "Insurance", "Actions"]
+                widths = [50, 100, 100, 100, 70, 120, 150, 120, 120]
+                
+                header_frame = ctk.CTkFrame(self.patient_table_scroll, fg_color="#1f538d")
+                header_frame.pack(fill="x", padx=5, pady=(5,0))
+                
+                for i, (col, width) in enumerate(zip(columns, widths)):
+                    header_frame.grid_columnconfigure(i, minsize=width)
+                    ctk.CTkLabel(header_frame, text=col, font=ctk.CTkFont(weight="bold"),
+                                text_color="white").grid(row=0, column=i, padx=5, pady=5, sticky="ew")
+                
+                # Create content frame
+                content_frame = ctk.CTkFrame(self.patient_table_scroll)
+                content_frame.pack(fill="both", expand=True, padx=5, pady=(0,5))
+                
+                for i, width in enumerate(widths):
+                    content_frame.grid_columnconfigure(i, minsize=width)
+                
+                # Add rows
+                for row_idx, patient in enumerate(patients):
+                    values = [str(patient[0]), patient[1], patient[2], str(patient[3]), 
+                             patient[4], patient[5], patient[6] or "N/A", patient[7] or "N/A"]
+                    
+                    for col_idx, (value, width) in enumerate(zip(values, widths[:-1])):
+                        ctk.CTkLabel(content_frame, text=value).grid(
+                            row=row_idx, column=col_idx, padx=5, pady=2, sticky="w"
+                        )
+                    
+                    # Action buttons
+                    actions_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+                    actions_frame.grid(row=row_idx, column=len(columns)-1, padx=5, pady=2)
+                    
+                    ctk.CTkButton(actions_frame, text="✏️", width=30, height=24,
+                                 command=lambda p=patient: self.edit_patient(p)).pack(side="left", padx=2)
+                    ctk.CTkButton(actions_frame, text="📋", width=30, height=24,
+                                 command=lambda p=patient: self.view_patient_records(p[0])).pack(side="left", padx=2)
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load patients: {e}")
+        finally:
+            if conn:
+                cursor.close()
+                conn.close()
+    
+    def edit_patient(self, patient):
+        # Create edit dialog
+        dialog = ctk.CTkToplevel(self.main_frame)
+        dialog.title("Edit Patient")
+        dialog.geometry("400x600")
+        
+        fields = [
+            ("First Name:", patient[1]),
+            ("Last Name:", patient[2]),
+            ("Date of Birth:", str(patient[3])),
+            ("Gender:", patient[4]),
+            ("Contact Number:", patient[5]),
+            ("Email:", patient[6] or ""),
+        ]
+        
+        entries = {}
+        for i, (label, value) in enumerate(fields):
+            ctk.CTkLabel(dialog, text=label).pack(pady=(10, 5))
+            if label == "Gender:":
+                entry = ctk.CTkOptionMenu(dialog, values=["M", "F"], width=300)
+                entry.set(value)
+            else:
+                entry = ctk.CTkEntry(dialog, width=300)
+                entry.insert(0, value)
+            entry.pack(pady=(0, 10))
+            entries[label] = entry
+        
+        def update_patient():
+            try:
+                conn = connect_db()
+                if conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        UPDATE Patient SET first_name=?, last_name=?, dob=?, gender=?, 
+                               contact_number=?, email=? WHERE patient_id=?
+                    """, (
+                        entries["First Name:"].get(),
+                        entries["Last Name:"].get(),
+                        entries["Date of Birth:"].get(),
+                        entries["Gender:"].get(),
+                        entries["Contact Number:"].get(),
+                        entries["Email:"].get() or None,
+                        patient[0]
+                    ))
+                    conn.commit()
+                    messagebox.showinfo("Success", "Patient updated successfully!")
+                    dialog.destroy()
+                    self.load_patients()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to update patient: {e}")
+            finally:
+                if conn:
+                    cursor.close()
+                    conn.close()
+        
+        ctk.CTkButton(dialog, text="Update", command=update_patient).pack(pady=20)
+    
+    def view_patient_records(self, patient_id):
+        # Create records dialog
+        dialog = ctk.CTkToplevel(self.main_frame)
+        dialog.title(f"Medical Records - Patient ID: {patient_id}")
+        dialog.geometry("800x600")
+        
+        # Records frame
+        records_frame = ctk.CTkScrollableFrame(dialog)
+        records_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        try:
+            conn = connect_db()
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT mr.record_id, mr.visit_date, mr.diagnosis, mr.notes,
+                           d.first_name + ' ' + d.last_name as doctor_name
+                    FROM Medical_Record mr
+                    LEFT JOIN Doctor d ON mr.doctor_id = d.doctor_id
+                    WHERE mr.patient_id = ?
+                    ORDER BY mr.visit_date DESC
+                """, (patient_id,))
+                records = cursor.fetchall()
+                
+                if records:
+                    for record in records:
+                        record_card = ctk.CTkFrame(records_frame)
+                        record_card.pack(fill="x", pady=10)
+                        
+                        ctk.CTkLabel(record_card, text=f"Record ID: {record[0]} | Date: {record[1]} | Doctor: {record[4]}",
+                                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", padx=10, pady=5)
+                        ctk.CTkLabel(record_card, text=f"Diagnosis: {record[2]}",
+                                    wraplength=700).pack(anchor="w", padx=10, pady=2)
+                        ctk.CTkLabel(record_card, text=f"Notes: {record[3] or 'No notes'}",
+                                    wraplength=700).pack(anchor="w", padx=10, pady=(2, 10))
+                else:
+                    ctk.CTkLabel(records_frame, text="No medical records found for this patient.",
+                                font=ctk.CTkFont(size=16)).pack(pady=50)
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load medical records: {e}")
+        finally:
+            if conn:
+                cursor.close()
+                conn.close()
+    
+    def show_medical_records(self):
+        self.clear_content()
+        
+        title = ctk.CTkLabel(self.content_frame, text="📋 Medical Records Management", 
+                            font=ctk.CTkFont(size=28, weight="bold"))
+        title.pack(pady=(0, 20))
+        
+        # Content container
+        content_container = ctk.CTkFrame(self.content_frame)
+        content_container.pack(fill="both", expand=True, padx=20)
+        content_container.grid_columnconfigure(1, weight=2)
+        content_container.grid_rowconfigure(0, weight=1)
+        
+        # Form section for adding new record
+        form_frame = ctk.CTkFrame(content_container)
+        form_frame.grid(row=0, column=0, sticky="nsew", padx=(20, 10), pady=20)
+        form_frame.grid_columnconfigure(1, weight=1)
+        
+        ctk.CTkLabel(form_frame, text="Add Medical Record", 
+                     font=ctk.CTkFont(size=18, weight="bold")).grid(row=0, column=0, columnspan=2, pady=15)
+        
+        # Form fields
+        fields = [
+            ("Patient ID:", "record_patient_id"),
+            ("Doctor ID:", "record_doctor_id"),
+            ("Visit Date:", "record_date"),
+            ("Diagnosis:", "record_diagnosis"),
+            ("Notes:", "record_notes")
+        ]
+        
+        self.record_entries = {}
+        for i, (label, key) in enumerate(fields, 1):
+            ctk.CTkLabel(form_frame, text=label).grid(row=i, column=0, padx=(20, 5), pady=5, sticky="w")
+            
+            if key in ["record_diagnosis", "record_notes"]:
+                entry = ctk.CTkTextbox(form_frame, height=60)
+            elif key == "record_date":
+                entry = ctk.CTkEntry(form_frame, placeholder_text="YYYY-MM-DD", height=35)
+            else:
+                entry = ctk.CTkEntry(form_frame, height=35)
+            
+            entry.grid(row=i, column=1, padx=(5, 20), pady=5, sticky="ew")
+            self.record_entries[key] = entry
+        
+        # Add button
+        ctk.CTkButton(form_frame, text="➕ Add Record", command=self.add_medical_record,
+                     height=40).grid(row=len(fields)+1, column=0, columnspan=2, padx=20, pady=20, sticky="ew")
+        
+        # Records list
+        list_frame = ctk.CTkFrame(content_container)
+        list_frame.grid(row=0, column=1, sticky="nsew", padx=(10, 20), pady=20)
+        list_frame.grid_columnconfigure(0, weight=1)
+        list_frame.grid_rowconfigure(1, weight=1)
+        
+        # Header
+        header = ctk.CTkFrame(list_frame)
+        header.grid(row=0, column=0, sticky="ew", padx=20, pady=(15, 5))
+        header.grid_columnconfigure(0, weight=1)
+        
+        ctk.CTkLabel(header, text="Recent Medical Records", 
+                     font=ctk.CTkFont(size=18, weight="bold")).grid(row=0, column=0, sticky="w")
+        ctk.CTkButton(header, text="🔄 Refresh", command=self.load_medical_records,
+                     width=100, height=30).grid(row=0, column=1)
+        
+        # Scrollable records list
+        self.records_list_scroll = ctk.CTkScrollableFrame(list_frame)
+        self.records_list_scroll.grid(row=1, column=0, sticky="nsew", padx=20, pady=(5, 20))
+        
+        self.load_medical_records()
+    
+    def add_medical_record(self):
+        entries = self.record_entries
+        try:
+            patient_id = entries['record_patient_id'].get()
+            doctor_id = entries['record_doctor_id'].get()
+            visit_date = entries['record_date'].get()
+            diagnosis = entries['record_diagnosis'].get("1.0", "end-1c")
+            notes = entries['record_notes'].get("1.0", "end-1c")
+            
+            if not all([patient_id, doctor_id, visit_date, diagnosis]):
+                messagebox.showerror("Error", "Please fill all required fields")
+                return
+            
+            if not self.validate_date(visit_date):
+                messagebox.showerror("Error", "Invalid date format (YYYY-MM-DD)")
+                return
+            
+            conn = connect_db()
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO Medical_Record (patient_id, doctor_id, visit_date, diagnosis, notes)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (int(patient_id), int(doctor_id), visit_date, diagnosis, notes or None))
+                conn.commit()
+                
+                messagebox.showinfo("Success", "Medical record added successfully!")
+                
+                # Clear form
+                for key, entry in entries.items():
+                    if hasattr(entry, 'delete'):
+                        if "textbox" in str(type(entry)).lower():
+                            entry.delete("1.0", "end")
+                        else:
+                            entry.delete(0, 'end')
+                
+                self.load_medical_records()
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to add medical record: {e}")
+        finally:
+            if conn:
+                cursor.close()
+                conn.close()
+    
+    def load_medical_records(self):
+        try:
+            # Clear existing content
+            for widget in self.records_list_scroll.winfo_children():
+                widget.destroy()
+            
+            conn = connect_db()
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT TOP 20 mr.record_id, mr.visit_date, mr.diagnosis, mr.notes,
+                           p.first_name + ' ' + p.last_name as patient_name,
+                           d.first_name + ' ' + d.last_name as doctor_name
+                    FROM Medical_Record mr
+                    LEFT JOIN Patient p ON mr.patient_id = p.patient_id
+                    LEFT JOIN Doctor d ON mr.doctor_id = d.doctor_id
+                    ORDER BY mr.visit_date DESC
+                """)
+                records = cursor.fetchall()
+                
+                for record in records:
+                    record_card = ctk.CTkFrame(self.records_list_scroll)
+                    record_card.pack(fill="x", pady=5)
+                    
+                    header_text = f"Record #{record[0]} | {record[1]} | Patient: {record[4]} | Doctor: {record[5]}"
+                    ctk.CTkLabel(record_card, text=header_text,
+                                font=ctk.CTkFont(weight="bold")).pack(anchor="w", padx=10, pady=5)
+                    
+                    ctk.CTkLabel(record_card, text=f"Diagnosis: {record[2]}",
+                                wraplength=500).pack(anchor="w", padx=10, pady=2)
+                    
+                    if record[3]:
+                        ctk.CTkLabel(record_card, text=f"Notes: {record[3]}",
+                                    wraplength=500).pack(anchor="w", padx=10, pady=(2, 10))
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load medical records: {e}")
+        finally:
+            if conn:
+                cursor.close()
+                conn.close()
+    
+    def show_patient_search(self):
+        self.clear_content()
+        
+        title = ctk.CTkLabel(self.content_frame, text="🔍 Patient Search", 
+                            font=ctk.CTkFont(size=28, weight="bold"))
+        title.pack(pady=(0, 20))
+        
+        # Search interface placeholder
+        search_frame = ctk.CTkFrame(self.content_frame)
+        search_frame.pack(fill="x", padx=20, pady=20)
+        
+        ctk.CTkLabel(search_frame, text="Advanced Patient Search", 
+                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
+        
+        # Search fields
+        search_fields = ctk.CTkFrame(search_frame)
+        search_fields.pack(padx=20, pady=20)
+        
+        ctk.CTkLabel(search_fields, text="Search by Name:").grid(row=0, column=0, padx=10, pady=5)
+        self.search_name = ctk.CTkEntry(search_fields, width=200)
+        self.search_name.grid(row=0, column=1, padx=10, pady=5)
+        
+        ctk.CTkLabel(search_fields, text="Search by ID:").grid(row=1, column=0, padx=10, pady=5)
+        self.search_id = ctk.CTkEntry(search_fields, width=200)
+        self.search_id.grid(row=1, column=1, padx=10, pady=5)
+        
+        ctk.CTkButton(search_fields, text="🔍 Search", command=self.perform_search).grid(row=2, column=0, columnspan=2, pady=20)
+        
+        # Results area
+        self.search_results = ctk.CTkScrollableFrame(self.content_frame, height=300)
+        self.search_results.pack(fill="both", expand=True, padx=20, pady=20)
+    
+    def perform_search(self):
+        # Clear previous results
+        for widget in self.search_results.winfo_children():
+            widget.destroy()
+        
+        name_query = self.search_name.get().strip()
+        id_query = self.search_id.get().strip()
+        
+        if not name_query and not id_query:
+            ctk.CTkLabel(self.search_results, text="Please enter search criteria").pack(pady=20)
+            return
+        
+        try:
+            conn = connect_db()
+            if conn:
+                cursor = conn.cursor()
+                
+                if id_query:
+                    cursor.execute("""
+                        SELECT patient_id, first_name, last_name, dob, gender, contact_number, email
+                        FROM Patient WHERE patient_id = ?
+                    """, (int(id_query),))
+                else:
+                    cursor.execute("""
+                        SELECT patient_id, first_name, last_name, dob, gender, contact_number, email
+                        FROM Patient WHERE first_name LIKE ? OR last_name LIKE ?
+                    """, (f"%{name_query}%", f"%{name_query}%"))
+                
+                results = cursor.fetchall()
+                
+                if results:
+                    for patient in results:
+                        result_card = ctk.CTkFrame(self.search_results)
+                        result_card.pack(fill="x", pady=5)
+                        
+                        info_text = f"ID: {patient[0]} | Name: {patient[1]} {patient[2]} | DOB: {patient[3]} | Contact: {patient[5]}"
+                        ctk.CTkLabel(result_card, text=info_text).pack(anchor="w", padx=10, pady=10)
+                        
+                        # Action buttons
+                        btn_frame = ctk.CTkFrame(result_card, fg_color="transparent")
+                        btn_frame.pack(anchor="w", padx=10, pady=(0, 10))
+                        
+                        ctk.CTkButton(btn_frame, text="📋 View Records", width=120,
+                                     command=lambda p=patient: self.view_patient_records(p[0])).pack(side="left", padx=5)
+                        ctk.CTkButton(btn_frame, text="✏️ Edit", width=80,
+                                     command=lambda p=patient: self.edit_patient(p)).pack(side="left", padx=5)
+                else:
+                    ctk.CTkLabel(self.search_results, text="No patients found matching your search criteria").pack(pady=20)
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Search failed: {e}")
+        finally:
+            if conn:
+                cursor.close()
+                conn.close()
+    
+    def show_patient_reports(self):
+        self.clear_content()
+        
+        title = ctk.CTkLabel(self.content_frame, text="📄 Patient Reports", 
+                            font=ctk.CTkFont(size=28, weight="bold"))
+        title.pack(pady=(0, 20))
+        
+        # Reports interface placeholder
+        info_label = ctk.CTkLabel(self.content_frame, 
+                                 text="Patient Reports Interface\n(Generate various patient reports and statistics)",
+                                 font=ctk.CTkFont(size=16))
+        info_label.pack(pady=50) 
