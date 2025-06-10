@@ -57,7 +57,7 @@ A comprehensive hospital management system built with Python and CustomTkinter, 
 
 4. **Start the application:**
    ```bash
-   python hospital_main.py
+   python main.py
    ```
 
 ### Manual Installation
