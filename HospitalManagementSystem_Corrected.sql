@@ -4,14 +4,23 @@ GO
 -- Drop existing tables (optional safety cleanup for development/testing)
 -- DROP TABLE IF EXISTS Prescription_Medicine, Bill_Item, Billing, Admission, Bed, Room, Pharmacy, Medical_Record, Appointment, Doctor, Patient, Department, Staff, Users;
 
--- 1. Department
+-- 1. Users (moved to top since other tables might reference it)
+CREATE TABLE Users (
+    user_id INT IDENTITY(1,1) PRIMARY KEY,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL CHECK (role IN ('Admin', 'Appointment', 'Patient', 'Pharmacist'))
+);
+GO
+
+-- 2. Department
 CREATE TABLE Department (
     department_id INT PRIMARY KEY IDENTITY,
     name VARCHAR(100),
     location VARCHAR(100)
 );
 
--- 2. Patient
+-- 3. Patient
 CREATE TABLE Patient (
     patient_id INT PRIMARY KEY IDENTITY,
     first_name VARCHAR(50),
@@ -23,7 +32,7 @@ CREATE TABLE Patient (
     address VARCHAR(200)
 );
 
--- 3. Doctor
+-- 4. Doctor
 CREATE TABLE Doctor (
     doctor_id INT PRIMARY KEY IDENTITY,
     first_name VARCHAR(50),
@@ -34,7 +43,7 @@ CREATE TABLE Doctor (
     department_id INT FOREIGN KEY REFERENCES Department(department_id)
 );
 
--- 4. Appointment
+-- 5. Appointment
 CREATE TABLE Appointment (
     appointment_id INT PRIMARY KEY IDENTITY,
     patient_id INT FOREIGN KEY REFERENCES Patient(patient_id),
@@ -44,7 +53,7 @@ CREATE TABLE Appointment (
     remarks TEXT
 );
 
--- 5. Medical_Record
+-- 6. Medical_Record
 CREATE TABLE Medical_Record (
     record_id INT PRIMARY KEY IDENTITY,
     patient_id INT FOREIGN KEY REFERENCES Patient(patient_id),
@@ -54,7 +63,7 @@ CREATE TABLE Medical_Record (
     notes TEXT
 );
 
--- 6. Pharmacy
+-- 7. Pharmacy
 CREATE TABLE Pharmacy (
     medicine_id INT PRIMARY KEY IDENTITY,
     name VARCHAR(100),
@@ -63,7 +72,7 @@ CREATE TABLE Pharmacy (
     expiry_date DATE
 );
 
--- 7. Prescription_Medicine
+-- 8. Prescription_Medicine
 CREATE TABLE Prescription_Medicine (
     record_id INT FOREIGN KEY REFERENCES Medical_Record(record_id),
     medicine_id INT FOREIGN KEY REFERENCES Pharmacy(medicine_id),
@@ -73,7 +82,7 @@ CREATE TABLE Prescription_Medicine (
     PRIMARY KEY (record_id, medicine_id)
 );
 
--- 8. Room
+-- 9. Room
 CREATE TABLE Room (
     room_id INT PRIMARY KEY IDENTITY,
     room_number VARCHAR(10),
@@ -81,26 +90,27 @@ CREATE TABLE Room (
     bed_count INT
 );
 
--- 9. Bed
+-- 10. Bed
 CREATE TABLE Bed (
-    bed_id INT PRIMARY KEY IDENTITY,
     room_id INT FOREIGN KEY REFERENCES Room(room_id),
-    bed_number VARCHAR(10),
-    is_occupied BIT
+    bed_number VARCHAR(10) NOT NULL,
+    is_occupied BIT NOT NULL,
+    PRIMARY KEY (room_id, bed_number)
 );
 
--- 10. Admission
+-- 11. Admission
 CREATE TABLE Admission (
     admission_id INT PRIMARY KEY IDENTITY,
     patient_id INT FOREIGN KEY REFERENCES Patient(patient_id),
-    room_id INT FOREIGN KEY REFERENCES Room(room_id),
-    bed_id INT FOREIGN KEY REFERENCES Bed(bed_id),
+    room_id INT,
+    bed_number VARCHAR(10),
     doctor_id INT FOREIGN KEY REFERENCES Doctor(doctor_id),
     admission_date DATE,
-    discharge_date DATE
+    discharge_date DATE,
+    FOREIGN KEY (room_id, bed_number) REFERENCES Bed(room_id, bed_number)
 );
 
--- 11. Billing
+-- 12. Billing
 CREATE TABLE Billing (
     bill_id INT PRIMARY KEY IDENTITY,
     patient_id INT FOREIGN KEY REFERENCES Patient(patient_id),
@@ -110,7 +120,7 @@ CREATE TABLE Billing (
     billing_date DATE
 );
 
--- 12. Bill_Item
+-- 13. Bill_Item
 CREATE TABLE Bill_Item (
     item_id INT PRIMARY KEY IDENTITY,
     bill_id INT FOREIGN KEY REFERENCES Billing(bill_id),
@@ -118,7 +128,7 @@ CREATE TABLE Bill_Item (
     amount DECIMAL(10,2)
 );
 
--- 13. Staff
+-- 14. Staff
 CREATE TABLE Staff (
     staff_id INT PRIMARY KEY IDENTITY,
     first_name VARCHAR(50),
@@ -127,14 +137,6 @@ CREATE TABLE Staff (
     shift VARCHAR(50),
     department_id INT FOREIGN KEY REFERENCES Department(department_id),
     contact_number VARCHAR(20)
-);
-
--- 14. Users
-CREATE TABLE Users (
-    user_id INT IDENTITY(1,1) PRIMARY KEY,
-    username VARCHAR(100) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    role VARCHAR(50) NOT NULL CHECK (role IN ('Admin', 'Appointment', 'Patient', 'Pharmacist'))
 );
 GO
 
@@ -209,6 +211,7 @@ CREATE OR ALTER PROCEDURE AdmitPatient
     @patient_id INT,
     @room_id INT,
     @bed_id INT,
+    @bed_number VARCHAR(10),
     @doctor_id INT,
     @admission_date DATE
 AS
@@ -219,7 +222,10 @@ BEGIN
     IF EXISTS (
         SELECT 1
         FROM Bed
-        WHERE bed_id = @bed_id AND is_occupied = 1
+        WHERE bed_id = @bed_id 
+        AND room_id = @room_id 
+        AND bed_number = @bed_number 
+        AND is_occupied = 1
     )
     BEGIN
         RAISERROR('The selected bed is already occupied.', 16, 1);
@@ -227,10 +233,14 @@ BEGIN
     END
 
     -- Admit the patient
-    INSERT INTO Admission (patient_id, room_id, bed_id, doctor_id, admission_date)
-    VALUES (@patient_id, @room_id, @bed_id, @doctor_id, @admission_date);
+    INSERT INTO Admission (patient_id, room_id, bed_number, doctor_id, admission_date)
+    VALUES (@patient_id, @room_id, @bed_number, @doctor_id, @admission_date);
 
-    -- (Optional) The bed is marked as occupied automatically by a trigger
+    -- Update bed status
+    UPDATE Bed
+    SET is_occupied = 1
+    WHERE room_id = @room_id 
+    AND bed_number = @bed_number;
 END;
 GO
 
@@ -296,6 +306,46 @@ BEGIN
     UPDATE Pharmacy SET stock_quantity = stock_quantity + @quantity WHERE medicine_id = @medicine_id;
 END;
 
+-- User Management Stored Procedures
+GO
+
+CREATE PROCEDURE CreateUser
+    @username VARCHAR(100),
+    @password_hash VARCHAR(255),
+    @role VARCHAR(50)
+AS
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM Users WHERE username = @username)
+    BEGIN
+        INSERT INTO Users (username, password_hash, role)
+        VALUES (@username, @password_hash, @role);
+        RETURN 1; -- Success
+    END
+    RETURN 0; -- Username already exists
+END;
+GO
+
+CREATE OR ALTER PROCEDURE AuthenticateUser
+    @username VARCHAR(100),
+    @password_hash VARCHAR(255)
+AS
+BEGIN
+    SELECT user_id, username, role
+    FROM Users
+    WHERE username = @username AND password_hash = @password_hash;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE CheckUsernameExists
+    @username VARCHAR(100)
+AS
+BEGIN
+    SELECT COUNT(*) as exists_count
+    FROM Users
+    WHERE username = @username;
+END;
+GO
+
 -- ============================
 -- TRIGGERS
 -- ============================
@@ -313,7 +363,7 @@ BEGIN
     UPDATE b
     SET b.is_occupied = 1
     FROM Bed b
-    INNER JOIN inserted i ON b.bed_id = i.bed_id;
+    INNER JOIN inserted i ON b.room_id = i.room_id AND b.bed_number = i.bed_number;
 END;
 GO
 
@@ -343,7 +393,7 @@ BEGIN
     UPDATE b
     SET b.is_occupied = 0
     FROM Bed b
-    INNER JOIN inserted i ON b.bed_id = i.bed_id
+    INNER JOIN inserted i ON b.room_id = i.room_id AND b.bed_number = i.bed_number
     INNER JOIN deleted d ON i.admission_id = d.admission_id
     WHERE d.discharge_date IS NULL AND i.discharge_date IS NOT NULL;
 END;

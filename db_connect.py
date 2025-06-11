@@ -20,19 +20,18 @@ def create_user(username, password, role):
         try:
             cursor = conn.cursor()
             hashed_password = hash_password(password)
-            cursor.execute("""
-                INSERT INTO Users (username, password_hash, role) 
-                VALUES (?, ?, ?)
-            """, (username, hashed_password, role))
+            print(username, hashed_password, role)
+            cursor.execute("EXEC CreateUser @username=?, @password_hash=?, @role=?", 
+                         (username, hashed_password, role))
             conn.commit()
-            return True
+            return 1  # Success
         except Exception as e:
             print(f"Error creating user: {e}")
-            return False
+            return 0  # Failed
         finally:
             cursor.close()
             conn.close()
-    return False
+    return 0
 
 def authenticate_user(username, password):
     """Authenticate user and return user info if successful"""
@@ -40,17 +39,16 @@ def authenticate_user(username, password):
     if conn:
         try:
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT user_id, username, password_hash, role 
-                FROM Users WHERE username = ?
-            """, (username,))
+            hashed_password = hash_password(password)
+            cursor.execute("EXEC AuthenticateUser @username=?, @password_hash=?", 
+                         (username, hashed_password))
             user = cursor.fetchone()
             
-            if user and verify_password(password, user[2]):
+            if user:
                 return {
                     'user_id': user[0],
                     'username': user[1],
-                    'role': user[3]
+                    'role': user[2]
                 }
             return None
         except Exception as e:
@@ -67,9 +65,9 @@ def check_username_exists(username):
     if conn:
         try:
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM Users WHERE username = ?", (username,))
-            count = cursor.fetchone()[0]
-            return count > 0
+            cursor.execute("EXEC CheckUsernameExists @username=?", (username,))
+            result = cursor.fetchone()
+            return result[0] > 0 if result else False
         except Exception as e:
             print(f"Error checking username: {e}")
             return False
@@ -192,14 +190,14 @@ def mark_bill_paid(bill_id):
             cursor.close()
             conn.close()
 
-def admit_patient(patient_id, bed_id, admission_date):
+def admit_patient(patient_id, room_id, bed_number, doctor_id, admission_date):
     conn = connect_db()
     if conn:
         try:
             cursor = conn.cursor()
             cursor.execute("""
-                EXEC AdmitPatient @PatientID=?, @BedID=?, @AdmissionDate=?
-            """, (patient_id, bed_id, admission_date))
+                EXEC AdmitPatient @PatientID=?, @RoomID=?, @BedNumber=?, @DoctorID=?, @AdmissionDate=?
+            """, (patient_id, room_id, bed_number, doctor_id, admission_date))
             conn.commit()
         except Exception as e:
             raise e
@@ -237,6 +235,58 @@ def add_bed(room_id, bed_number):
         finally:
             cursor.close()
             conn.close()
+
+def update_bed(room_id, bed_number, is_occupied):
+    conn = connect_db()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE Bed 
+                SET is_occupied=?
+                WHERE room_id=? AND bed_number=?
+            """, (is_occupied, room_id, bed_number))
+            conn.commit()
+        except Exception as e:
+            raise e
+        finally:
+            cursor.close()
+            conn.close()
+
+def delete_bed(room_id, bed_number):
+    conn = connect_db()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                DELETE FROM Bed 
+                WHERE room_id=? AND bed_number=?
+            """, (room_id, bed_number))
+            conn.commit()
+        except Exception as e:
+            raise e
+        finally:
+            cursor.close()
+            conn.close()
+
+def get_beds():
+    conn = connect_db()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT b.room_id, r.room_number, b.bed_number, b.is_occupied
+                FROM Bed b
+                JOIN Room r ON b.room_id = r.room_id
+            """)
+            return cursor.fetchall()
+        except Exception as e:
+            print(f"Error: {e}")
+            return []
+        finally:
+            cursor.close()
+            conn.close()
+    return []
 
 def get_patients():
     conn = connect_db()
@@ -415,36 +465,6 @@ def delete_appointment(app_id):
         try:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM Appointment WHERE AppointmentID=?", (app_id,))
-            conn.commit()
-        except Exception as e:
-            raise e
-        finally:
-            cursor.close()
-            conn.close()
-
-def update_bed(bed_id, room_id, bed_number, is_occupied):
-    conn = connect_db()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE Bed 
-                SET room_id=?, bed_number=?, is_occupied=?
-                WHERE bed_id=?
-            """, (room_id, bed_number, is_occupied, bed_id))
-            conn.commit()
-        except Exception as e:
-            raise e
-        finally:
-            cursor.close()
-            conn.close()
-
-def delete_bed(bed_id):
-    conn = connect_db()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM Bed WHERE bed_id=?", (bed_id,))
             conn.commit()
         except Exception as e:
             raise e
@@ -763,16 +783,16 @@ def add_department(name, location):
             cursor.close()
             conn.close()
 
-def update_department(dept_id, name, location):
+def update_department(dept_id, dept_name):
     conn = connect_db()
     if conn:
         try:
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE Department 
-                SET name=?, location=?
+                SET name=?
                 WHERE department_id=?
-            """, (name, location, dept_id))
+            """, (dept_name, dept_id))
             conn.commit()
         except Exception as e:
             raise e
@@ -891,15 +911,23 @@ def get_medical_records():
             conn.close()
     return []
 
-def get_beds():
+def get_admissions():
     conn = connect_db()
     if conn:
         try:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT b.bed_id, b.room_id, r.room_number, b.bed_number, b.is_occupied
-                FROM Bed b
-                JOIN Room r ON b.room_id = r.room_id
+                SELECT a.admission_id, a.patient_id, 
+                       p.first_name + ' ' + p.last_name as patient_name,
+                       a.room_id, r.room_number,
+                       a.bed_number,
+                       a.doctor_id, d.first_name + ' ' + d.last_name as doctor_name,
+                       a.admission_date, a.discharge_date
+                FROM Admission a
+                JOIN Patient p ON a.patient_id = p.patient_id
+                JOIN Room r ON a.room_id = r.room_id
+                JOIN Doctor d ON a.doctor_id = d.doctor_id
+                ORDER BY a.admission_date DESC
             """)
             return cursor.fetchall()
         except Exception as e:

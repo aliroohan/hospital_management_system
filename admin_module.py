@@ -1086,15 +1086,15 @@ class AdminModule:
             if conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT b.bed_id, b.room_id, r.room_number, b.bed_number, b.is_occupied
+                    SELECT b.room_id, r.room_number, b.bed_number, b.is_occupied
                     FROM Bed b
                     LEFT JOIN Room r ON b.room_id = r.room_id
                 """)
                 beds = cursor.fetchall()
                 
                 # Create header
-                columns = ["ID", "Room ID", "Room Number", "Bed Number", "Status", "Actions"]
-                widths = [50, 80, 100, 100, 80, 120]
+                columns = ["ID", "Room Number", "Bed Number", "Status", "Actions"]
+                widths = [50, 100, 100, 80, 120]
                 
                 header_frame = ctk.CTkFrame(self.bed_table_scroll, fg_color="#1f538d")
                 header_frame.pack(fill="x", padx=5, pady=(5,0))
@@ -1113,8 +1113,8 @@ class AdminModule:
                 
                 # Add rows
                 for row_idx, bed in enumerate(beds):
-                    status = "Occupied" if bed[4] else "Available"
-                    values = [str(bed[0]), str(bed[1]), bed[2] or "N/A", bed[3], status]
+                    status = "Occupied" if bed[3] else "Available"
+                    values = [str(bed[0]), str(bed[1]), bed[2] or "N/A", status]
                     
                     for col_idx, (value, width) in enumerate(zip(values, widths[:-1])):
                         ctk.CTkLabel(content_frame, text=value).grid(
