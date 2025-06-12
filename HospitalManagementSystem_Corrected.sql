@@ -84,30 +84,29 @@ CREATE TABLE Prescription_Medicine (
 
 -- 9. Room
 CREATE TABLE Room (
-    room_id INT PRIMARY KEY IDENTITY,
-    room_number VARCHAR(10),
+    room_number VARCHAR(10) PRIMARY KEY,
     room_type VARCHAR(50),
     bed_count INT
 );
 
 -- 10. Bed
 CREATE TABLE Bed (
-    room_id INT FOREIGN KEY REFERENCES Room(room_id),
+    room_number VARCHAR(10) FOREIGN KEY REFERENCES Room(room_number),
     bed_number VARCHAR(10) NOT NULL,
     is_occupied BIT NOT NULL,
-    PRIMARY KEY (room_id, bed_number)
+    PRIMARY KEY (room_number, bed_number)
 );
 
 -- 11. Admission
 CREATE TABLE Admission (
     admission_id INT PRIMARY KEY IDENTITY,
     patient_id INT FOREIGN KEY REFERENCES Patient(patient_id),
-    room_id INT,
+    room_number VARCHAR(10),
     bed_number VARCHAR(10),
     doctor_id INT FOREIGN KEY REFERENCES Doctor(doctor_id),
     admission_date DATE,
     discharge_date DATE,
-    FOREIGN KEY (room_id, bed_number) REFERENCES Bed(room_id, bed_number)
+    FOREIGN KEY (room_number, bed_number) REFERENCES Bed(room_number, bed_number)
 );
 
 -- 12. Billing
@@ -209,8 +208,7 @@ GO
 
 CREATE OR ALTER PROCEDURE AdmitPatient
     @patient_id INT,
-    @room_id INT,
-    @bed_id INT,
+    @room_number VARCHAR(10),
     @bed_number VARCHAR(10),
     @doctor_id INT,
     @admission_date DATE
@@ -222,8 +220,7 @@ BEGIN
     IF EXISTS (
         SELECT 1
         FROM Bed
-        WHERE bed_id = @bed_id 
-        AND room_id = @room_id 
+        WHERE room_number = @room_number 
         AND bed_number = @bed_number 
         AND is_occupied = 1
     )
@@ -233,13 +230,13 @@ BEGIN
     END
 
     -- Admit the patient
-    INSERT INTO Admission (patient_id, room_id, bed_number, doctor_id, admission_date)
-    VALUES (@patient_id, @room_id, @bed_number, @doctor_id, @admission_date);
+    INSERT INTO Admission (patient_id, room_number, bed_number, doctor_id, admission_date)
+    VALUES (@patient_id, @room_number, @bed_number, @doctor_id, @admission_date);
 
     -- Update bed status
     UPDATE Bed
     SET is_occupied = 1
-    WHERE room_id = @room_id 
+    WHERE room_number = @room_number 
     AND bed_number = @bed_number;
 END;
 GO
@@ -363,7 +360,7 @@ BEGIN
     UPDATE b
     SET b.is_occupied = 1
     FROM Bed b
-    INNER JOIN inserted i ON b.room_id = i.room_id AND b.bed_number = i.bed_number;
+    INNER JOIN inserted i ON b.room_number = i.room_number AND b.bed_number = i.bed_number;
 END;
 GO
 
@@ -393,7 +390,7 @@ BEGIN
     UPDATE b
     SET b.is_occupied = 0
     FROM Bed b
-    INNER JOIN inserted i ON b.room_id = i.room_id AND b.bed_number = i.bed_number
+    INNER JOIN inserted i ON b.room_number = i.room_number AND b.bed_number = i.bed_number
     INNER JOIN deleted d ON i.admission_id = d.admission_id
     WHERE d.discharge_date IS NULL AND i.discharge_date IS NOT NULL;
 END;

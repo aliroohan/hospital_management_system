@@ -225,6 +225,11 @@ class AdminModule:
             conn = connect_db()
             if conn:
                 cursor = conn.cursor()
+                # Check if department exists
+                cursor.execute("SELECT 1 FROM Department WHERE department_id = ?", (dept_id,))
+                if not cursor.fetchone():
+                    messagebox.showerror("Error", f"Department ID '{dept_id}' does not exist. Please add the department first.")
+                    return
                 cursor.execute("""
                     INSERT INTO Doctor (first_name, last_name, specialization, contact_number, email, department_id)
                     VALUES (?, ?, ?, ?, ?, ?)
@@ -320,13 +325,24 @@ class AdminModule:
             ("Specialization:", doctor[3]),
             ("Contact:", doctor[4]),
             ("Email:", doctor[5] or ""),
+            ("Department:", doctor[6] if len(doctor) > 6 else "")
         ]
         
         entries = {}
         for i, (label, value) in enumerate(fields):
             ctk.CTkLabel(dialog, text=label).pack(pady=(10, 5))
-            entry = ctk.CTkEntry(dialog, width=300)
-            entry.insert(0, value)
+            if label == "Department:":
+                from db_connect import get_departments
+                departments = get_departments()
+                dept_names = [f"{d[0]} - {d[1]}" for d in departments]
+                entry = ctk.CTkOptionMenu(dialog, values=dept_names, width=300)
+                if value:
+                    entry.set(value)
+                else:
+                    entry.set(dept_names[0] if dept_names else "")
+            else:
+                entry = ctk.CTkEntry(dialog, width=300)
+                entry.insert(0, value)
             entry.pack(pady=(0, 10))
             entries[label] = entry
         
@@ -335,15 +351,24 @@ class AdminModule:
                 conn = connect_db()
                 if conn:
                     cursor = conn.cursor()
+                    # Get department_id from dropdown
+                    dept_val = entries["Department:"].get()
+                    dept_id = dept_val.split(" - ")[0] if dept_val else None
+                    # Check if department exists
+                    cursor.execute("SELECT 1 FROM Department WHERE department_id = ?", (dept_id,))
+                    if not cursor.fetchone():
+                        messagebox.showerror("Error", f"Department ID '{dept_id}' does not exist. Please add the department first.")
+                        return
                     cursor.execute("""
                         UPDATE Doctor SET first_name=?, last_name=?, specialization=?, 
-                               contact_number=?, email=? WHERE doctor_id=?
+                               contact_number=?, email=?, department_id=? WHERE doctor_id=?
                     """, (
                         entries["First Name:"].get(),
                         entries["Last Name:"].get(),
                         entries["Specialization:"].get(),
                         entries["Contact:"].get(),
                         entries["Email:"].get(),
+                        int(dept_id),
                         doctor[0]
                     ))
                     conn.commit()
@@ -463,6 +488,11 @@ class AdminModule:
             conn = connect_db()
             if conn:
                 cursor = conn.cursor()
+                # Check if department exists
+                cursor.execute("SELECT 1 FROM Department WHERE department_id = ?", (dept_id,))
+                if not cursor.fetchone():
+                    messagebox.showerror("Error", f"Department ID '{dept_id}' does not exist. Please add the department first.")
+                    return
                 cursor.execute("""
                     INSERT INTO Staff (first_name, last_name, role, shift, contact_number, department_id)
                     VALUES (?, ?, ?, ?, ?, ?)
@@ -475,8 +505,8 @@ class AdminModule:
                 for key, entry in entries.items():
                     if hasattr(entry, 'delete'):
                         entry.delete(0, 'end')
-                    else:  # For OptionMenu
-                        entry.set("Morning")
+                    elif hasattr(entry, 'set'):
+                        entry.set('')
                 
                 self.load_staff()
                 
@@ -561,6 +591,7 @@ class AdminModule:
             ("Role:", staff[3]),
             ("Shift:", staff[4]),
             ("Contact:", staff[5] or ""),
+            ("Department:", staff[6] if len(staff) > 6 else "")
         ]
         
         entries = {}
@@ -569,6 +600,15 @@ class AdminModule:
             if label == "Shift:":
                 entry = ctk.CTkOptionMenu(dialog, values=["Morning", "Evening", "Night"], width=300)
                 entry.set(value)
+            elif label == "Department:":
+                from db_connect import get_departments
+                departments = get_departments()
+                dept_names = [f"{d[0]} - {d[1]}" for d in departments]
+                entry = ctk.CTkOptionMenu(dialog, values=dept_names, width=300)
+                if value:
+                    entry.set(value)
+                else:
+                    entry.set(dept_names[0] if dept_names else "")
             else:
                 entry = ctk.CTkEntry(dialog, width=300)
                 entry.insert(0, value)
@@ -580,8 +620,16 @@ class AdminModule:
                 conn = connect_db()
                 if conn:
                     cursor = conn.cursor()
+                    # Get department_id from dropdown
+                    dept_val = entries["Department:"].get()
+                    dept_id = dept_val.split(" - ")[0] if dept_val else None
+                    # Check if department exists
+                    cursor.execute("SELECT 1 FROM Department WHERE department_id = ?", (dept_id,))
+                    if not cursor.fetchone():
+                        messagebox.showerror("Error", f"Department ID '{dept_id}' does not exist. Please add the department first.")
+                        return
                     cursor.execute("""
-                        UPDATE Staff SET first_name=?, last_name=?, role=?, shift=?, contact_number=?
+                        UPDATE Staff SET first_name=?, last_name=?, role=?, shift=?, contact_number=?, department_id=?
                         WHERE staff_id=?
                     """, (
                         entries["First Name:"].get(),
@@ -589,6 +637,7 @@ class AdminModule:
                         entries["Role:"].get(),
                         entries["Shift:"].get(),
                         entries["Contact:"].get(),
+                        int(dept_id),
                         staff[0]
                     ))
                     conn.commit()
@@ -846,8 +895,11 @@ class AdminModule:
                 messagebox.showinfo("Success", "Room added successfully!")
                 
                 # Clear form
-                for entry in entries.values():
-                    entry.delete(0, 'end')
+                for key, entry in entries.items():
+                    if hasattr(entry, 'delete'):
+                        entry.delete(0, 'end')
+                    elif hasattr(entry, 'set'):
+                        entry.set('')
                 
                 self.load_rooms()
                 
@@ -868,14 +920,14 @@ class AdminModule:
             if conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT room_id, room_number, room_type, bed_count
+                    SELECT room_number, room_type, bed_count
                     FROM Room
                 """)
                 rooms = cursor.fetchall()
                 
                 # Create header
-                columns = ["ID", "Room Number", "Room Type", "Bed Count", "Actions"]
-                widths = [50, 100, 100, 100, 120]
+                columns = ["Room Number", "Room Type", "Bed Count", "Actions"]
+                widths = [100, 100, 100, 120]
                 
                 header_frame = ctk.CTkFrame(self.room_table_scroll, fg_color="#1f538d")
                 header_frame.pack(fill="x", padx=5, pady=(5,0))
@@ -894,7 +946,7 @@ class AdminModule:
                 
                 # Add rows
                 for row_idx, room in enumerate(rooms):
-                    values = [str(room[0]), str(room[1]), room[2], str(room[3])]
+                    values = [str(room[0]), room[1], str(room[2])]
                     
                     for col_idx, (value, width) in enumerate(zip(values, widths[:-1])):
                         ctk.CTkLabel(content_frame, text=value).grid(
@@ -924,16 +976,20 @@ class AdminModule:
         dialog.geometry("400x500")
         
         fields = [
-            ("Room Number:", room[1]),
-            ("Room Type:", room[2]),
-            ("Bed Count:", room[3]),
+            ("Room Number:", room[0]),
+            ("Room Type:", room[1]),
+            ("Bed Count:", room[2]),
         ]
         
         entries = {}
         for i, (label, value) in enumerate(fields):
             ctk.CTkLabel(dialog, text=label).pack(pady=(10, 5))
-            entry = ctk.CTkEntry(dialog, width=300)
-            entry.insert(0, value)
+            if label == "Room Type:":
+                entry = ctk.CTkOptionMenu(dialog, values=["General", "ICU", "Private", "Emergency"], width=300)
+                entry.set(value)
+            else:
+                entry = ctk.CTkEntry(dialog, width=300)
+                entry.insert(0, value)
             entry.pack(pady=(0, 10))
             entries[label] = entry
         
@@ -944,7 +1000,7 @@ class AdminModule:
                     cursor = conn.cursor()
                     cursor.execute("""
                         UPDATE Room SET room_number=?, room_type=?, bed_count=?
-                        WHERE room_id=?
+                        WHERE room_number=?
                     """, (
                         entries["Room Number:"].get(),
                         entries["Room Type:"].get(),
@@ -964,13 +1020,13 @@ class AdminModule:
         
         ctk.CTkButton(dialog, text="Update", command=update_room).pack(pady=20)
     
-    def delete_room(self, room_id):
+    def delete_room(self, room_number):
         if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this room?"):
             try:
                 conn = connect_db()
                 if conn:
                     cursor = conn.cursor()
-                    cursor.execute("DELETE FROM Room WHERE room_id = ?", (room_id,))
+                    cursor.execute("DELETE FROM Room WHERE room_number = ?", (room_number,))
                     conn.commit()
                     messagebox.showinfo("Success", "Room deleted successfully!")
                     self.load_rooms()
@@ -1005,7 +1061,7 @@ class AdminModule:
         
         # Form fields
         fields = [
-            ("Room ID:", "bed_room_id"),
+            ("Room Number:", "bed_room_number"),
             ("Bed Number:", "bed_number")
         ]
         
@@ -1045,27 +1101,35 @@ class AdminModule:
     def add_bed(self):
         entries = self.bed_entries
         try:
-            room_id = entries['bed_room_id'].get()
+            room_number = entries['bed_room_number'].get()
             bed_number = entries['bed_number'].get()
             
-            if not all([room_id, bed_number]):
+            if not all([room_number, bed_number]):
                 messagebox.showerror("Error", "Please fill all required fields")
                 return
             
             conn = connect_db()
             if conn:
                 cursor = conn.cursor()
+                # Check if room exists
+                cursor.execute("SELECT 1 FROM Room WHERE room_number = ?", (room_number,))
+                if not cursor.fetchone():
+                    messagebox.showerror("Error", f"Room '{room_number}' does not exist. Please add the room first.")
+                    return
                 cursor.execute("""
-                    INSERT INTO Bed (room_id, bed_number, is_occupied)
+                    INSERT INTO Bed (room_number, bed_number, is_occupied)
                     VALUES (?, ?, 0)
-                """, (int(room_id), bed_number))
+                """, (room_number, bed_number))
                 conn.commit()
                 
                 messagebox.showinfo("Success", "Bed added successfully!")
                 
                 # Clear form
-                for entry in entries.values():
-                    entry.delete(0, 'end')
+                for key, entry in entries.items():
+                    if hasattr(entry, 'delete'):
+                        entry.delete(0, 'end')
+                    elif hasattr(entry, 'set'):
+                        entry.set('')
                 
                 self.load_beds()
                 
@@ -1086,15 +1150,15 @@ class AdminModule:
             if conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT b.room_id, r.room_number, b.bed_number, b.is_occupied
+                    SELECT b.room_number, r.room_number, b.bed_number, b.is_occupied
                     FROM Bed b
-                    LEFT JOIN Room r ON b.room_id = r.room_id
+                    LEFT JOIN Room r ON b.room_number = r.room_number
                 """)
                 beds = cursor.fetchall()
                 
                 # Create header
-                columns = ["ID", "Room Number", "Bed Number", "Status", "Actions"]
-                widths = [50, 100, 100, 80, 120]
+                columns = ["Room Number", "Room Number", "Bed Number", "Status", "Actions"]
+                widths = [100, 100, 100, 80, 120]
                 
                 header_frame = ctk.CTkFrame(self.bed_table_scroll, fg_color="#1f538d")
                 header_frame.pack(fill="x", padx=5, pady=(5,0))
@@ -1144,8 +1208,8 @@ class AdminModule:
         dialog.geometry("400x300")
         
         fields = [
-            ("Room ID:", bed[1]),
-            ("Bed Number:", bed[3]),
+            ("Room Number:", bed[0]),
+            ("Bed Number:", bed[2]),
         ]
         
         entries = {}
@@ -1161,13 +1225,18 @@ class AdminModule:
                 conn = connect_db()
                 if conn:
                     cursor = conn.cursor()
+                    # Check if room exists
+                    cursor.execute("SELECT 1 FROM Room WHERE room_number = ?", (entries["Room Number:"].get(),))
+                    if not cursor.fetchone():
+                        messagebox.showerror("Error", f"Room '{entries['Room Number:'].get()}' does not exist. Please add the room first.")
+                        return
                     cursor.execute("""
-                        UPDATE Bed SET room_id=?, bed_number=?
+                        UPDATE Bed SET room_number=?, bed_number=?
                         WHERE bed_id=?
                     """, (
-                        int(entries["Room ID:"].get()),
+                        entries["Room Number:"].get(),
                         entries["Bed Number:"].get(),
-                        bed[0]
+                        bed[1]
                     ))
                     conn.commit()
                     messagebox.showinfo("Success", "Bed updated successfully!")
@@ -1352,4 +1421,58 @@ class AdminModule:
                 messagebox.showinfo("Success", "Department deleted successfully!")
                 self.load_departments()
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to delete department: {e}") 
+                messagebox.showerror("Error", f"Failed to delete department: {e}")
+
+    def get_all_rooms(self):
+        cursor.execute("""
+            SELECT room_number, room_type, bed_count
+            FROM Room
+        """)
+        return cursor.fetchall()
+
+    def update_room(self, room_number, room_type, bed_count):
+        cursor.execute("""
+            UPDATE Room
+            SET room_type=?, bed_count=?
+            WHERE room_number=?
+        """, (room_type, bed_count, room_number))
+        conn.commit()
+
+    def delete_room(self, room_number):
+        try:
+            cursor.execute("DELETE FROM Room WHERE room_number = ?", (room_number,))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error deleting room: {e}")
+            return False
+
+    def add_bed_to_db(self, room_number, bed_number):
+        try:
+            if not all([room_number, bed_number]):
+                return False
+            cursor.execute("""
+                INSERT INTO Bed (room_number, bed_number, is_occupied)
+                VALUES (?, ?, 0)
+            """, (room_number, bed_number))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error adding bed: {e}")
+            return False
+
+    def get_all_beds(self):
+        cursor.execute("""
+            SELECT b.room_number, r.room_number, b.bed_number, b.is_occupied
+            FROM Bed b
+            LEFT JOIN Room r ON b.room_number = r.room_number
+        """)
+        return cursor.fetchall()
+
+    def update_bed(self, room_number, bed_number, is_occupied):
+        cursor.execute("""
+            UPDATE Bed
+            SET room_number=?, bed_number=?, is_occupied=?
+            WHERE room_number=? AND bed_number=?
+        """, (room_number, bed_number, is_occupied, room_number, bed_number))
+        conn.commit() 

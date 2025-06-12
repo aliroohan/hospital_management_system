@@ -190,14 +190,15 @@ def mark_bill_paid(bill_id):
             cursor.close()
             conn.close()
 
-def admit_patient(patient_id, room_id, bed_number, doctor_id, admission_date):
+def admit_patient(patient_id, room_number, bed_number, doctor_id, admission_date):
     conn = connect_db()
     if conn:
         try:
             cursor = conn.cursor()
             cursor.execute("""
-                EXEC AdmitPatient @PatientID=?, @RoomID=?, @BedNumber=?, @DoctorID=?, @AdmissionDate=?
-            """, (patient_id, room_id, bed_number, doctor_id, admission_date))
+                INSERT INTO Admission (patient_id, room_number, bed_number, doctor_id, admission_date)
+                VALUES (?, ?, ?, ?, ?)
+            """, (patient_id, room_number, bed_number, doctor_id, admission_date))
             conn.commit()
         except Exception as e:
             raise e
@@ -220,15 +221,15 @@ def discharge_patient(admission_id, discharge_date):
             cursor.close()
             conn.close()
 
-def add_bed(room_id, bed_number):
+def add_bed(room_number, bed_number):
     conn = connect_db()
     if conn:
         try:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO Bed (room_id, bed_number, is_occupied)
+                INSERT INTO Bed (room_number, bed_number, is_occupied)
                 VALUES (?, ?, 0)
-            """, (room_id, bed_number))
+            """, (room_number, bed_number))
             conn.commit()
         except Exception as e:
             raise e
@@ -236,16 +237,16 @@ def add_bed(room_id, bed_number):
             cursor.close()
             conn.close()
 
-def update_bed(room_id, bed_number, is_occupied):
+def update_bed(room_number, bed_number, is_occupied):
     conn = connect_db()
     if conn:
         try:
             cursor = conn.cursor()
             cursor.execute("""
-                UPDATE Bed 
-                SET is_occupied=?
-                WHERE room_id=? AND bed_number=?
-            """, (is_occupied, room_id, bed_number))
+                UPDATE Bed
+                SET is_occupied = ?
+                WHERE room_number=? AND bed_number=?
+            """, (is_occupied, room_number, bed_number))
             conn.commit()
         except Exception as e:
             raise e
@@ -253,15 +254,15 @@ def update_bed(room_id, bed_number, is_occupied):
             cursor.close()
             conn.close()
 
-def delete_bed(room_id, bed_number):
+def delete_bed(room_number, bed_number):
     conn = connect_db()
     if conn:
         try:
             cursor = conn.cursor()
             cursor.execute("""
-                DELETE FROM Bed 
-                WHERE room_id=? AND bed_number=?
-            """, (room_id, bed_number))
+                DELETE FROM Bed
+                WHERE room_number=? AND bed_number=?
+            """, (room_number, bed_number))
             conn.commit()
         except Exception as e:
             raise e
@@ -275,9 +276,9 @@ def get_beds():
         try:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT b.room_id, r.room_number, b.bed_number, b.is_occupied
+                SELECT b.room_number, r.room_number, b.bed_number, b.is_occupied
                 FROM Bed b
-                JOIN Room r ON b.room_id = r.room_id
+                JOIN Room r ON b.room_number = r.room_number
             """)
             return cursor.fetchall()
         except Exception as e:
@@ -472,16 +473,16 @@ def delete_appointment(app_id):
             cursor.close()
             conn.close()
 
-def update_room(room_id, room_number, room_type, max_beds, status):
+def update_room(room_number, room_type, max_beds, status):
     conn = connect_db()
     if conn:
         try:
             cursor = conn.cursor()
             cursor.execute("""
-                UPDATE Room 
-                SET room_number=?, room_type=?, bed_count=?, status=?
-                WHERE room_id=?
-            """, (room_number, room_type, max_beds, status, room_id))
+                UPDATE Room
+                SET room_type=?, bed_count=?, status=?
+                WHERE room_number=?
+            """, (room_type, max_beds, status, room_number))
             conn.commit()
         except Exception as e:
             raise e
@@ -489,16 +490,17 @@ def update_room(room_id, room_number, room_type, max_beds, status):
             cursor.close()
             conn.close()
 
-def delete_room(room_id):
+def delete_room(room_number):
     conn = connect_db()
     if conn:
         try:
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM Bed WHERE room_id=?", (room_id,))
+            cursor.execute("SELECT COUNT(*) FROM Bed WHERE room_number=?", (room_number,))
             if cursor.fetchone()[0] > 0:
-                raise Exception("Cannot delete room with assigned beds")
-            cursor.execute("DELETE FROM Room WHERE room_id=?", (room_id,))
+                return False
+            cursor.execute("DELETE FROM Room WHERE room_number=?", (room_number,))
             conn.commit()
+            return True
         except Exception as e:
             raise e
         finally:
@@ -709,7 +711,7 @@ def get_rooms():
         try:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT room_id, room_number, room_type, bed_count, status
+                SELECT room_number, room_type, bed_count, status
                 FROM Room
             """)
             return cursor.fetchall()
@@ -919,13 +921,13 @@ def get_admissions():
             cursor.execute("""
                 SELECT a.admission_id, a.patient_id, 
                        p.first_name + ' ' + p.last_name as patient_name,
-                       a.room_id, r.room_number,
+                       a.room_number, r.room_number,
                        a.bed_number,
                        a.doctor_id, d.first_name + ' ' + d.last_name as doctor_name,
                        a.admission_date, a.discharge_date
                 FROM Admission a
                 JOIN Patient p ON a.patient_id = p.patient_id
-                JOIN Room r ON a.room_id = r.room_id
+                JOIN Room r ON a.room_number = r.room_number
                 JOIN Doctor d ON a.doctor_id = d.doctor_id
                 ORDER BY a.admission_date DESC
             """)
@@ -937,3 +939,64 @@ def get_admissions():
             cursor.close()
             conn.close()
     return []
+
+def get_all_beds():
+    conn = connect_db()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT b.room_number, r.room_number, b.bed_number, b.is_occupied
+                FROM Bed b
+                JOIN Room r ON b.room_number = r.room_number
+            """)
+            return cursor.fetchall()
+        except Exception as e:
+            print(f"Error: {e}")
+            return []
+        finally:
+            cursor.close()
+            conn.close()
+    return []
+
+def get_all_rooms():
+    conn = connect_db()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT room_number, room_type, bed_count, status
+                FROM Room
+            """)
+            return cursor.fetchall()
+        except Exception as e:
+            print(f"Error: {e}")
+            return []
+        finally:
+            cursor.close()
+            conn.close()
+    return []
+
+def get_admission_details(admission_id):
+    conn = connect_db()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT a.admission_id, p.first_name, p.last_name,
+                a.room_number, r.room_number,
+                a.bed_number, a.admission_date, a.discharge_date,
+                d.first_name, d.last_name
+                FROM Admission a
+                JOIN Patient p ON a.patient_id = p.patient_id
+                JOIN Room r ON a.room_number = r.room_number
+                JOIN Doctor d ON a.doctor_id = d.doctor_id
+                WHERE a.admission_id = ?
+            """, (admission_id,))
+            return cursor.fetchone()
+        except Exception as e:
+            print(f"Error: {e}")
+            return None
+        finally:
+            cursor.close()
+            conn.close()
