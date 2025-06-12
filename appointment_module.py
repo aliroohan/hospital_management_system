@@ -82,13 +82,40 @@ class AppointmentModule:
         stats_frame.pack(fill="x", padx=20, pady=10)
         stats_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
         
-        # Sample stats cards
-        stats = [
-            ("📅 Today's Appointments", "12", "#3498db"),
-            ("⏳ Pending", "8", "#f39c12"),
-            ("✅ Completed", "25", "#27ae60"),
-            ("❌ Cancelled", "3", "#e74c3c")
-        ]
+        # Get real stats from database
+        try:
+            conn = connect_db()
+            if conn:
+                cursor = conn.cursor()
+                # Today's Appointments
+                cursor.execute("SELECT COUNT(*) FROM Appointment WHERE CAST(appointment_date AS DATE) = CAST(GETDATE() AS DATE)")
+                todays_appointments = cursor.fetchone()[0] or 0
+                # Pending (scheduled)
+                cursor.execute("SELECT COUNT(*) FROM Appointment WHERE status = 'scheduled'")
+                pending = cursor.fetchone()[0] or 0
+                # Completed
+                cursor.execute("SELECT COUNT(*) FROM Appointment WHERE status = 'completed'")
+                completed = cursor.fetchone()[0] or 0
+                # Cancelled
+                cursor.execute("SELECT COUNT(*) FROM Appointment WHERE status = 'cancelled'")
+                cancelled = cursor.fetchone()[0] or 0
+                cursor.close()
+                conn.close()
+                stats = [
+                    ("📅 Today's Appointments", str(todays_appointments), "#3498db"),
+                    ("⏳ Pending", str(pending), "#f39c12"),
+                    ("✅ Completed", str(completed), "#27ae60"),
+                    ("❌ Cancelled", str(cancelled), "#e74c3c")
+                ]
+        except Exception as e:
+            # Fallback to sample data if database error
+            print(f"Error fetching stats: {e}")
+            stats = [
+                ("📅 Today's Appointments", "0", "#3498db"),
+                ("⏳ Pending", "0", "#f39c12"),
+                ("✅ Completed", "0", "#27ae60"),
+                ("❌ Cancelled", "0", "#e74c3c")
+            ]
         
         for i, (title, count, color) in enumerate(stats):
             card = ctk.CTkFrame(stats_frame, fg_color=color)
@@ -842,8 +869,64 @@ class AppointmentModule:
                             font=ctk.CTkFont(size=28, weight="bold"))
         title.pack(pady=(0, 20))
         
-        # Reports interface placeholder
-        info_label = ctk.CTkLabel(self.content_frame, 
-                                 text="Appointment Reports Interface\n(Generate statistics and reports for appointments)",
-                                 font=ctk.CTkFont(size=16))
-        info_label.pack(pady=50) 
+        try:
+            conn = connect_db()
+            if conn:
+                cursor = conn.cursor()
+                # Total appointments
+                cursor.execute("SELECT COUNT(*) FROM Appointment")
+                total = cursor.fetchone()[0] or 0
+                # Completed
+                cursor.execute("SELECT COUNT(*) FROM Appointment WHERE status = 'completed'")
+                completed = cursor.fetchone()[0] or 0
+                # Cancelled
+                cursor.execute("SELECT COUNT(*) FROM Appointment WHERE status = 'cancelled'")
+                cancelled = cursor.fetchone()[0] or 0
+                # Pending
+                cursor.execute("SELECT COUNT(*) FROM Appointment WHERE status = 'scheduled'")
+                pending = cursor.fetchone()[0] or 0
+                # Appointments per doctor (last 30 days)
+                cursor.execute("""
+                    SELECT d.first_name + ' ' + d.last_name as doctor_name, COUNT(a.appointment_id)
+                    FROM Appointment a
+                    LEFT JOIN Doctor d ON a.doctor_id = d.doctor_id
+                    WHERE a.appointment_date >= DATEADD(day, -30, GETDATE())
+                    GROUP BY d.first_name, d.last_name
+                    ORDER BY COUNT(a.appointment_id) DESC
+                """)
+                per_doctor = cursor.fetchall()
+                cursor.close()
+                conn.close()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load reports: {e}")
+            return
+        # Show summary stats
+        stats_frame = ctk.CTkFrame(self.content_frame)
+        stats_frame.pack(fill="x", padx=20, pady=10)
+        stats = [
+            ("Total Appointments", total, "#2980b9"),
+            ("Completed", completed, "#27ae60"),
+            ("Cancelled", cancelled, "#e74c3c"),
+            ("Pending", pending, "#f39c12")
+        ]
+        for i, (label, value, color) in enumerate(stats):
+            card = ctk.CTkFrame(stats_frame, fg_color=color)
+            card.grid(row=0, column=i, padx=10, pady=20, sticky="ew")
+            ctk.CTkLabel(card, text=str(value), font=ctk.CTkFont(size=28, weight="bold"), text_color="white").pack(pady=(10, 5))
+            ctk.CTkLabel(card, text=label, font=ctk.CTkFont(size=14), text_color="white").pack(pady=(0, 10))
+        # Table: Appointments per doctor (last 30 days)
+        table_frame = ctk.CTkFrame(self.content_frame)
+        table_frame.pack(fill="x", padx=20, pady=20)
+        ctk.CTkLabel(table_frame, text="Appointments per Doctor (Last 30 Days)", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
+        if per_doctor:
+            header = ctk.CTkFrame(table_frame, fg_color="#1f538d")
+            header.pack(fill="x", padx=5, pady=(5,0))
+            ctk.CTkLabel(header, text="Doctor", font=ctk.CTkFont(weight="bold"), text_color="white", width=200).pack(side="left", padx=10)
+            ctk.CTkLabel(header, text="Appointments", font=ctk.CTkFont(weight="bold"), text_color="white", width=120).pack(side="left", padx=10)
+            for doc, count in per_doctor:
+                row = ctk.CTkFrame(table_frame)
+                row.pack(fill="x", padx=5, pady=2)
+                ctk.CTkLabel(row, text=doc, width=200).pack(side="left", padx=10)
+                ctk.CTkLabel(row, text=str(count), width=120).pack(side="left", padx=10)
+        else:
+            ctk.CTkLabel(table_frame, text="No data for the last 30 days.").pack(pady=20) 
