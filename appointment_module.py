@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import re
 from db_connect import *
 from CTkTable import *
+from tkcalendar import Calendar
 
 class AppointmentModule:
     def __init__(self, main_frame, user_info):
@@ -117,14 +118,14 @@ class AppointmentModule:
                 ("❌ Cancelled", "0", "#e74c3c")
             ]
         
-        for i, (title, count, color) in enumerate(stats):
+        num_stats = len(stats)
+        for col in range(num_stats):
+            stats_frame.grid_columnconfigure(col, weight=1)
+        for i, (label, value, color) in enumerate(stats):
             card = ctk.CTkFrame(stats_frame, fg_color=color)
-            card.grid(row=0, column=i, padx=10, pady=20, sticky="ew")
-            
-            ctk.CTkLabel(card, text=count, font=ctk.CTkFont(size=36, weight="bold"), 
-                        text_color="white").pack(pady=(20, 5))
-            ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=14), 
-                        text_color="white").pack(pady=(0, 20))
+            card.grid(row=0, column=i, padx=10, pady=20, sticky="nsew")
+            ctk.CTkLabel(card, text=str(value), font=ctk.CTkFont(size=28, weight="bold"), text_color="white").pack(pady=(10, 5))
+            ctk.CTkLabel(card, text=label, font=ctk.CTkFont(size=14), text_color="white").pack(pady=(0, 10))
         
         # Quick actions
         actions_frame = ctk.CTkFrame(self.content_frame)
@@ -215,7 +216,8 @@ class AppointmentModule:
         fields = [
             ("Patient ID:", "app_patient_id"),
             ("Doctor ID:", "app_doctor_id"),
-            ("Appointment Date & Time:", "app_datetime"),
+            ("Appointment Date:", "app_date"),
+            ("Appointment Time (Hour):", "app_time"),
             ("Remarks:", "app_remarks")
         ]
         
@@ -225,15 +227,26 @@ class AppointmentModule:
                 row=i, column=0, padx=(20, 5), pady=10, sticky="w"
             )
             
-            if key == "app_datetime":
-                entry = ctk.CTkEntry(form_frame, placeholder_text="YYYY-MM-DD HH:MM", height=40)
+            if key == "app_date":
+                date_frame = ctk.CTkFrame(form_frame)
+                date_frame.grid(row=i, column=1, padx=(5, 20), pady=10, sticky="ew")
+                cal = Calendar(date_frame, selectmode='day', date_pattern='yyyy-mm-dd', mindate=datetime.now().date())
+                cal.pack()
+                self.appointment_entries[key] = cal
+            elif key == "app_time":
+                time_values = [f"{h:02d}:00" for h in range(0, 24)]
+                time_menu = ctk.CTkOptionMenu(form_frame, values=time_values)
+                time_menu.set(time_values[0])
+                time_menu.grid(row=i, column=1, padx=(5, 20), pady=10, sticky="ew")
+                self.appointment_entries[key] = time_menu
             elif key == "app_remarks":
                 entry = ctk.CTkTextbox(form_frame, height=80)
+                entry.grid(row=i, column=1, padx=(5, 20), pady=10, sticky="ew")
+                self.appointment_entries[key] = entry
             else:
                 entry = ctk.CTkEntry(form_frame, height=40)
-            
-            entry.grid(row=i, column=1, padx=(5, 20), pady=10, sticky="ew")
-            self.appointment_entries[key] = entry
+                entry.grid(row=i, column=1, padx=(5, 20), pady=10, sticky="ew")
+                self.appointment_entries[key] = entry
         
         # Helper buttons for patient/doctor selection
         helper_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
@@ -392,47 +405,43 @@ class AppointmentModule:
         try:
             patient_id = entries['app_patient_id'].get().strip()
             doctor_id = entries['app_doctor_id'].get().strip()
-            app_datetime = entries['app_datetime'].get().strip()
+            app_date = entries['app_date'].get_date()  # from Calendar
+            app_time = entries['app_time'].get().strip()
             remarks = entries['app_remarks'].get("1.0", "end-1c").strip() if hasattr(entries['app_remarks'], 'get') else ""
-            
+            # Combine date and time
+            app_datetime = f"{app_date} {app_time}"
             # Validation
-            if not all([patient_id, doctor_id, app_datetime]):
+            if not all([patient_id, doctor_id, app_date, app_time]):
                 messagebox.showerror("Error", "Please fill all required fields")
                 return
-            
-            if not self.validate_datetime(app_datetime):
-                messagebox.showerror("Error", "Invalid datetime format (YYYY-MM-DD HH:MM)")
-                return
-            
             # Check if appointment time is in the future
             appointment_time = datetime.strptime(app_datetime, '%Y-%m-%d %H:%M')
-            if appointment_time <= datetime.now():
+            now = datetime.now()
+            if appointment_time <= now:
                 messagebox.showerror("Error", "Appointment time must be in the future")
                 return
-            
+            # If date is today, only allow future hours
+            if app_date == now.strftime('%Y-%m-%d') and int(app_time[:2]) <= now.hour:
+                messagebox.showerror("Error", "Please select a future hour for today.")
+                return
             conn = connect_db()
             if conn:
                 cursor = conn.cursor()
-                
                 # Check for conflicts
                 cursor.execute("""
                     SELECT COUNT(*) FROM Appointment 
                     WHERE doctor_id = ? AND appointment_date = ? AND status != 'cancelled'
                 """, (int(doctor_id), app_datetime))
-                
                 if cursor.fetchone()[0] > 0:
                     messagebox.showerror("Error", "Doctor already has an appointment at this time")
                     return
-                
                 # Schedule the appointment
                 cursor.execute("""
                     INSERT INTO Appointment (patient_id, doctor_id, appointment_date, status, remarks)
                     VALUES (?, ?, ?, 'scheduled', ?)
                 """, (int(patient_id), int(doctor_id), app_datetime, remarks or None))
-                
                 conn.commit()
                 messagebox.showinfo("Success", "Appointment scheduled successfully!")
-                
                 # Clear form
                 for key, entry in entries.items():
                     if hasattr(entry, 'delete'):
@@ -440,7 +449,6 @@ class AppointmentModule:
                             entry.delete("1.0", "end")
                         else:
                             entry.delete(0, 'end')
-                
         except Exception as e:
             messagebox.showerror("Error", f"Failed to schedule appointment: {e}")
         finally:
@@ -909,9 +917,12 @@ class AppointmentModule:
             ("Cancelled", cancelled, "#e74c3c"),
             ("Pending", pending, "#f39c12")
         ]
+        num_stats = len(stats)
+        for col in range(num_stats):
+            stats_frame.grid_columnconfigure(col, weight=1)
         for i, (label, value, color) in enumerate(stats):
             card = ctk.CTkFrame(stats_frame, fg_color=color)
-            card.grid(row=0, column=i, padx=10, pady=20, sticky="ew")
+            card.grid(row=0, column=i, padx=10, pady=20, sticky="nsew")
             ctk.CTkLabel(card, text=str(value), font=ctk.CTkFont(size=28, weight="bold"), text_color="white").pack(pady=(10, 5))
             ctk.CTkLabel(card, text=label, font=ctk.CTkFont(size=14), text_color="white").pack(pady=(0, 10))
         # Table: Appointments per doctor (last 30 days)
