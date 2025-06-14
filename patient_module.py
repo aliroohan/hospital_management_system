@@ -48,8 +48,7 @@ class PatientModule:
             ("📊 Dashboard", self.show_dashboard),
             ("👥 Manage Patients", self.show_patient_management),
             ("📋 Medical Records", self.show_medical_records),
-            ("🔍 Search Patients", self.show_patient_search),
-            ("📄 Patient Reports", self.show_patient_reports),
+            ("🔍 Search Patients", self.show_patient_search)
         ]
         
         for i, (text, command) in enumerate(buttons, 1):
@@ -77,32 +76,36 @@ class PatientModule:
     
     def show_dashboard(self):
         self.clear_content()
-        
-        # Dashboard title
-        title = ctk.CTkLabel(self.content_frame, text="📊 Patient Dashboard", 
-                            font=ctk.CTkFont(size=28, weight="bold"))
+        title = ctk.CTkLabel(self.content_frame, text="📊 Patient Dashboard", font=ctk.CTkFont(size=28, weight="bold"))
         title.pack(pady=(0, 30))
-        
-        # Stats container
         stats_frame = ctk.CTkFrame(self.content_frame)
         stats_frame.pack(fill="x", padx=20, pady=10)
-        stats_frame.grid_columnconfigure((0, 1, 2), weight=1)
-        
-        # Sample stats cards
+        # Fetch real patient stats from database
+        try:
+            conn = connect_db()
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT patient_id, first_name, last_name, dob, gender, contact_number, email, address
+                    FROM Patient
+                """)
+                patients = cursor.fetchall()
+                cursor.close()
+                conn.close()
+        except Exception as e:
+            patients = []
         stats = [
-            ("👥 Total Patients", "156", "#3498db"),
-            ("📋 Medical Records", "342", "#e74c3c"),
-            ("🆕 New This Month", "28", "#27ae60")
+            ("👥 Total Patients", len(patients), "#3498db"),
+            ("🆕 New Today", sum(1 for p in patients if p[3].strftime('%Y-%m-%d') == datetime.now().strftime('%Y-%m-%d')), "#27ae60")
         ]
-        
-        for i, (title, count, color) in enumerate(stats):
+        num_stats = len(stats)
+        for col in range(num_stats):
+            stats_frame.grid_columnconfigure(col, weight=1)
+        for i, (label, value, color) in enumerate(stats):
             card = ctk.CTkFrame(stats_frame, fg_color=color)
-            card.grid(row=0, column=i, padx=10, pady=20, sticky="ew")
-            
-            ctk.CTkLabel(card, text=count, font=ctk.CTkFont(size=36, weight="bold"), 
-                        text_color="white").pack(pady=(20, 5))
-            ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=14), 
-                        text_color="white").pack(pady=(0, 20))
+            card.grid(row=0, column=i, padx=10, pady=20, sticky="nsew")
+            ctk.CTkLabel(card, text=str(value), font=ctk.CTkFont(size=28, weight="bold"), text_color="white").pack(pady=(10, 5))
+            ctk.CTkLabel(card, text=label, font=ctk.CTkFont(size=14), text_color="white").pack(pady=(0, 10))
         
         # Quick actions
         actions_frame = ctk.CTkFrame(self.content_frame)
@@ -121,25 +124,6 @@ class PatientModule:
         ctk.CTkButton(quick_buttons, text="🔍 Search Patient", 
                      command=self.show_patient_search).pack(side="left", padx=10)
         
-        # Recent activity
-        recent_frame = ctk.CTkFrame(self.content_frame)
-        recent_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        
-        ctk.CTkLabel(recent_frame, text="Recent Patient Activity", 
-                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
-        
-        # Sample recent activity
-        activity_items = [
-            "👤 John Doe - Registered today",
-            "📋 Jane Smith - Medical record updated",
-            "🔄 Mike Johnson - Information updated",
-            "👤 Sarah Wilson - New patient registered"
-        ]
-        
-        for item in activity_items:
-            item_frame = ctk.CTkFrame(recent_frame, fg_color="transparent")
-            item_frame.pack(fill="x", padx=20, pady=5)
-            ctk.CTkLabel(item_frame, text=item, font=ctk.CTkFont(size=14)).pack(anchor="w")
     
     def show_patient_management(self):
         self.clear_content()
@@ -171,8 +155,7 @@ class PatientModule:
             ("Gender:", "patient_gender"),
             ("Contact Number:", "patient_contact"),
             ("Email:", "patient_email"),
-            ("Address:", "patient_address"),
-            ("Insurance ID:", "patient_insurance")
+            ("Address:", "patient_address")
         ]
         
         self.patient_entries = {}
@@ -225,46 +208,35 @@ class PatientModule:
             contact = entries['patient_contact'].get()
             email = entries['patient_email'].get()
             address = entries['patient_address'].get()
-            insurance_id = entries['patient_insurance'].get()
-            
             # Validation
             if not all([first_name, last_name, dob, gender, contact]):
                 messagebox.showerror("Error", "Please fill all required fields")
                 return
-            
             if not self.validate_date(dob):
                 messagebox.showerror("Error", "Invalid date format (YYYY-MM-DD)")
                 return
-            
             if not self.validate_phone(contact):
                 messagebox.showerror("Error", "Contact number must be 10 digits")
                 return
-            
             if email and not self.validate_email(email):
                 messagebox.showerror("Error", "Invalid email format")
                 return
-            
             conn = connect_db()
             if conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    INSERT INTO Patient (first_name, last_name, dob, gender, contact_number, email, address, insurance_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (first_name, last_name, dob, gender, contact, email or None, address, 
-                     int(insurance_id) if insurance_id else None))
+                    INSERT INTO Patient (first_name, last_name, dob, gender, contact_number, email, address)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (first_name, last_name, dob, gender, contact, email or None, address))
                 conn.commit()
-                
                 messagebox.showinfo("Success", "Patient registered successfully!")
-                
                 # Clear form
                 for key, entry in entries.items():
                     if hasattr(entry, 'delete'):
                         entry.delete(0, 'end')
                     else:  # For OptionMenu
                         entry.set("M")
-                
                 self.load_patients()
-                
         except Exception as e:
             messagebox.showerror("Error", f"Failed to register patient: {e}")
         finally:
@@ -277,56 +249,45 @@ class PatientModule:
             # Clear existing content
             for widget in self.patient_table_scroll.winfo_children():
                 widget.destroy()
-            
             conn = connect_db()
             if conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT p.patient_id, p.first_name, p.last_name, p.dob, p.gender, 
-                           p.contact_number, p.email, i.company_name as insurance_company
-                    FROM Patient p
-                    LEFT JOIN Insurance i ON p.insurance_id = i.insurance_id
+                    SELECT patient_id, first_name, last_name, dob, gender, contact_number, email, address
+                    FROM Patient
                 """)
                 patients = cursor.fetchall()
-                
                 # Create header
-                columns = ["ID", "First Name", "Last Name", "DOB", "Gender", "Contact", "Email", "Insurance", "Actions"]
-                widths = [50, 100, 100, 100, 70, 120, 150, 120, 120]
-                
+                columns = ["ID", "First Name", "Last Name", "DOB", "Gender", "Contact", "Email", "Address", "Actions"]
+                # Use smaller widths to avoid horizontal scroll
+                widths = [40, 80, 80, 80, 50, 100, 120, 140, 80]
                 header_frame = ctk.CTkFrame(self.patient_table_scroll, fg_color="#1f538d")
                 header_frame.pack(fill="x", padx=5, pady=(5,0))
-                
                 for i, (col, width) in enumerate(zip(columns, widths)):
                     header_frame.grid_columnconfigure(i, minsize=width)
-                    ctk.CTkLabel(header_frame, text=col, font=ctk.CTkFont(weight="bold"),
-                                text_color="white").grid(row=0, column=i, padx=5, pady=5, sticky="ew")
-                
+                    ctk.CTkLabel(header_frame, text=col, font=ctk.CTkFont(size=12, weight="bold"),
+                                text_color="white").grid(row=0, column=i, padx=2, pady=4, sticky="ew")
                 # Create content frame
                 content_frame = ctk.CTkFrame(self.patient_table_scroll)
                 content_frame.pack(fill="both", expand=True, padx=5, pady=(0,5))
-                
                 for i, width in enumerate(widths):
                     content_frame.grid_columnconfigure(i, minsize=width)
-                
                 # Add rows
                 for row_idx, patient in enumerate(patients):
                     values = [str(patient[0]), patient[1], patient[2], str(patient[3]), 
                              patient[4], patient[5], patient[6] or "N/A", patient[7] or "N/A"]
-                    
                     for col_idx, (value, width) in enumerate(zip(values, widths[:-1])):
-                        ctk.CTkLabel(content_frame, text=value).grid(
-                            row=row_idx, column=col_idx, padx=5, pady=2, sticky="w"
+                        wrap = width-10 if col_idx in [6,7] else 0
+                        ctk.CTkLabel(content_frame, text=value, font=ctk.CTkFont(size=12), wraplength=wrap).grid(
+                            row=row_idx, column=col_idx, padx=2, pady=2, sticky="w"
                         )
-                    
                     # Action buttons
                     actions_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-                    actions_frame.grid(row=row_idx, column=len(columns)-1, padx=5, pady=2)
-                    
-                    ctk.CTkButton(actions_frame, text="✏️", width=30, height=24,
-                                 command=lambda p=patient: self.edit_patient(p)).pack(side="left", padx=2)
-                    ctk.CTkButton(actions_frame, text="📋", width=30, height=24,
-                                 command=lambda p=patient: self.view_patient_records(p[0])).pack(side="left", padx=2)
-                
+                    actions_frame.grid(row=row_idx, column=len(columns)-1, padx=2, pady=2)
+                    ctk.CTkButton(actions_frame, text="✏️", width=28, height=22,
+                                 command=lambda p=patient: self.edit_patient(p)).pack(side="left", padx=1)
+                    ctk.CTkButton(actions_frame, text="📋", width=28, height=22,
+                                 command=lambda p=patient: self.view_patient_records(p[0])).pack(side="left", padx=1)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load patients: {e}")
         finally:
@@ -339,7 +300,6 @@ class PatientModule:
         dialog = ctk.CTkToplevel(self.main_frame)
         dialog.title("Edit Patient")
         dialog.geometry("400x600")
-        
         fields = [
             ("First Name:", patient[1]),
             ("Last Name:", patient[2]),
@@ -347,6 +307,7 @@ class PatientModule:
             ("Gender:", patient[4]),
             ("Contact Number:", patient[5]),
             ("Email:", patient[6] or ""),
+            ("Address:", patient[7] or "")
         ]
         
         entries = {}
@@ -368,7 +329,7 @@ class PatientModule:
                     cursor = conn.cursor()
                     cursor.execute("""
                         UPDATE Patient SET first_name=?, last_name=?, dob=?, gender=?, 
-                               contact_number=?, email=? WHERE patient_id=?
+                               contact_number=?, email=?, address=? WHERE patient_id=?
                     """, (
                         entries["First Name:"].get(),
                         entries["Last Name:"].get(),
@@ -376,6 +337,7 @@ class PatientModule:
                         entries["Gender:"].get(),
                         entries["Contact Number:"].get(),
                         entries["Email:"].get() or None,
+                        entries["Address:"].get() or None,
                         patient[0]
                     ))
                     conn.commit()
@@ -645,12 +607,12 @@ class PatientModule:
                 
                 if id_query:
                     cursor.execute("""
-                        SELECT patient_id, first_name, last_name, dob, gender, contact_number, email
+                        SELECT patient_id, first_name, last_name, dob, gender, contact_number, email, address
                         FROM Patient WHERE patient_id = ?
                     """, (int(id_query),))
                 else:
                     cursor.execute("""
-                        SELECT patient_id, first_name, last_name, dob, gender, contact_number, email
+                        SELECT patient_id, first_name, last_name, dob, gender, contact_number, email, address
                         FROM Patient WHERE first_name LIKE ? OR last_name LIKE ?
                     """, (f"%{name_query}%", f"%{name_query}%"))
                 
@@ -684,13 +646,4 @@ class PatientModule:
     
     def show_patient_reports(self):
         self.clear_content()
-        
-        title = ctk.CTkLabel(self.content_frame, text="📄 Patient Reports", 
-                            font=ctk.CTkFont(size=28, weight="bold"))
-        title.pack(pady=(0, 20))
-        
-        # Reports interface placeholder
-        info_label = ctk.CTkLabel(self.content_frame, 
-                                 text="Patient Reports Interface\n(Generate various patient reports and statistics)",
-                                 font=ctk.CTkFont(size=16))
-        info_label.pack(pady=50) 
+        # This section is now removed. 
