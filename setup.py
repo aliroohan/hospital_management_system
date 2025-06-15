@@ -37,8 +37,7 @@ def check_files():
         'auth_interface.py',
         'admin_module.py',
         'patient_module.py',
-        'appointment_module.py', 
-        'pharmacy_module.py',
+        'appointment_module.py',
         'db_connect.py',
         'HospitalManagementSystem_Corrected.sql'
     ]

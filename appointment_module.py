@@ -940,4 +940,63 @@ class AppointmentModule:
                 ctk.CTkLabel(row, text=doc, width=200).pack(side="left", padx=10)
                 ctk.CTkLabel(row, text=str(count), width=120).pack(side="left", padx=10)
         else:
-            ctk.CTkLabel(table_frame, text="No data for the last 30 days.").pack(pady=20) 
+            ctk.CTkLabel(table_frame, text="No data for the last 30 days.").pack(pady=20)
+
+    def show_doctor_schedule(self, doctor_id):
+        """Display doctor's schedule for the next 7 days"""
+        try:
+            # Get today and 7 days from now
+            today = datetime.now().date()
+            end_date = today + timedelta(days=7)
+            
+            schedule = get_doctor_schedule(doctor_id, today, end_date)
+            if schedule:
+                # Create a new window for schedule
+                schedule_window = ctk.CTkToplevel(self.main_frame)
+                schedule_window.title("Doctor's Schedule")
+                schedule_window.geometry("800x600")
+                
+                # Create scrollable frame
+                scroll_frame = ctk.CTkScrollableFrame(schedule_window)
+                scroll_frame.pack(fill="both", expand=True, padx=20, pady=20)
+                
+                # Add title
+                ctk.CTkLabel(scroll_frame, text="Upcoming Schedule", 
+                            font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(0, 20))
+                
+                # Group appointments by date
+                appointments_by_date = {}
+                for appt in schedule:
+                    date = appt[1].date()
+                    if date not in appointments_by_date:
+                        appointments_by_date[date] = []
+                    appointments_by_date[date].append(appt)
+                
+                # Display appointments by date
+                for date in sorted(appointments_by_date.keys()):
+                    # Date header
+                    date_frame = ctk.CTkFrame(scroll_frame)
+                    date_frame.pack(fill="x", pady=10, padx=10)
+                    
+                    ctk.CTkLabel(date_frame, text=date.strftime("%A, %B %d, %Y"),
+                                font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", padx=10, pady=5)
+                    
+                    # Appointments for this date
+                    for appt in appointments_by_date[date]:
+                        appt_frame = ctk.CTkFrame(date_frame)
+                        appt_frame.pack(fill="x", pady=5, padx=20)
+                        
+                        time_str = appt[1].strftime("%I:%M %p")
+                        status_color = "#27ae60" if appt[2] == "scheduled" else "#e74c3c"
+                        
+                        ctk.CTkLabel(appt_frame, text=f"{time_str} - {appt[3]}",
+                                    font=ctk.CTkFont(weight="bold")).pack(side="left", padx=10, pady=5)
+                        ctk.CTkLabel(appt_frame, text=f"Status: {appt[2]}",
+                                    text_color=status_color).pack(side="right", padx=10, pady=5)
+                    
+                    # Separator
+                    ctk.CTkFrame(scroll_frame, height=1, fg_color="gray").pack(fill="x", padx=10, pady=5)
+            else:
+                messagebox.showinfo("No Schedule", "No appointments found for this period.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load doctor's schedule: {e}") 

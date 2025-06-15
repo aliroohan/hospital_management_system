@@ -5,7 +5,6 @@ from auth_interface import AuthInterface
 from admin_module import AdminModule
 from patient_module import PatientModule
 from appointment_module import AppointmentModule
-from pharmacy_module import PharmacyModule
 from db_connect import ensure_database
 
 # Set appearance mode and default color theme
@@ -40,7 +39,7 @@ class HospitalManagementSystem:
     def setup_database(self):
         """Ensure the database and tables exist"""
         try:
-            ensure_database(server='localhost', db_name='Hospital', sql_file_name='HospitalManagementSystem_Corrected.sql')
+            ensure_database(server='localhost', db_name='Hospital', sql_file_name='HospitalManagementSystem.sql')
         except Exception as e:
             messagebox.showerror("Database Error", 
                                f"Failed to setup database: {e}\n\nPlease ensure SQL Server is running and accessible.")
@@ -88,8 +87,6 @@ class HospitalManagementSystem:
             self.current_module = PatientModule(self.content_frame, self.current_user)
         elif role == "Appointment":
             self.current_module = AppointmentModule(self.content_frame, self.current_user)
-        elif role == "Pharmacist":
-            self.current_module = PharmacyModule(self.content_frame, self.current_user)
         else:
             messagebox.showerror("Error", f"Unknown role: {role}")
             self.logout()

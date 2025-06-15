@@ -25,7 +25,6 @@ class PatientModule:
         # Create sidebar
         self.sidebar_frame = ctk.CTkFrame(self.main_frame, width=250, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(6, weight=1)
         
         # Create content area
         self.content_frame = ctk.CTkScrollableFrame(self.main_frame)
@@ -39,16 +38,19 @@ class PatientModule:
         header_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
         header_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 10))
         
-        ctk.CTkLabel(header_frame, text="👤 PATIENT", font=ctk.CTkFont(size=24, weight="bold")).pack()
+        ctk.CTkLabel(header_frame, text="👤 PATIENT", font=ctk.CTkFont(size=22, weight="bold")).pack()
         ctk.CTkLabel(header_frame, text=f"Welcome, {self.user_info['username']}", 
                      font=ctk.CTkFont(size=12)).pack(pady=(5, 0))
         
         # Navigation buttons
         buttons = [
             ("📊 Dashboard", self.show_dashboard),
-            ("👥 Manage Patients", self.show_patient_management),
+            ("👥 Patient List", self.show_patient_management),
+            ("🔍 Patient Search", self.show_patient_search),
+            ("🏥 Admit Patient", self.show_admission_interface),
             ("📋 Medical Records", self.show_medical_records),
-            ("🔍 Search Patients", self.show_patient_search)
+            ("📅 Appointments", self.show_appointments),
+            ("🛏️ Admitted Patients", self.show_admitted_patients),
         ]
         
         for i, (text, command) in enumerate(buttons, 1):
@@ -299,7 +301,12 @@ class PatientModule:
         # Create edit dialog
         dialog = ctk.CTkToplevel(self.main_frame)
         dialog.title("Edit Patient")
-        dialog.geometry("400x600")
+        dialog.geometry("400x800")
+        
+        # Create scrollable frame
+        scroll_frame = ctk.CTkScrollableFrame(dialog)
+        scroll_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
         fields = [
             ("First Name:", patient[1]),
             ("Last Name:", patient[2]),
@@ -312,12 +319,12 @@ class PatientModule:
         
         entries = {}
         for i, (label, value) in enumerate(fields):
-            ctk.CTkLabel(dialog, text=label).pack(pady=(10, 5))
+            ctk.CTkLabel(scroll_frame, text=label).pack(pady=(10, 5))
             if label == "Gender:":
-                entry = ctk.CTkOptionMenu(dialog, values=["M", "F"], width=300)
+                entry = ctk.CTkOptionMenu(scroll_frame, values=["M", "F"], width=300)
                 entry.set(value)
             else:
-                entry = ctk.CTkEntry(dialog, width=300)
+                entry = ctk.CTkEntry(scroll_frame, width=300)
                 entry.insert(0, value)
             entry.pack(pady=(0, 10))
             entries[label] = entry
@@ -351,8 +358,7 @@ class PatientModule:
                     cursor.close()
                     conn.close()
         
-        ctk.CTkButton(dialog, text="Update", command=update_patient).pack(pady=20)
-    
+        ctk.CTkButton(scroll_frame, text="Update", command=update_patient).pack(pady=20)
     def view_patient_records(self, patient_id):
         # Create records dialog
         dialog = ctk.CTkToplevel(self.main_frame)
@@ -647,3 +653,275 @@ class PatientModule:
     def show_patient_reports(self):
         self.clear_content()
         # This section is now removed. 
+
+    def show_patient_history(self, patient_id):
+        """Display patient's complete medical history"""
+        try:
+            records = get_patient_history(patient_id)
+            if records:
+                # Create a new window for history
+                history_window = ctk.CTkToplevel(self.main_frame)
+                history_window.title("Patient Medical History")
+                history_window.geometry("800x600")
+                
+                # Create scrollable frame
+                scroll_frame = ctk.CTkScrollableFrame(history_window)
+                scroll_frame.pack(fill="both", expand=True, padx=20, pady=20)
+                
+                # Add title
+                ctk.CTkLabel(scroll_frame, text="Medical History", 
+                            font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(0, 20))
+                
+                # Display each record
+                for record in records:
+                    record_frame = ctk.CTkFrame(scroll_frame)
+                    record_frame.pack(fill="x", pady=10, padx=10)
+                    
+                    # Visit date and doctor info
+                    header_text = f"Visit Date: {record[1]} | Doctor: {record[4]} ({record[5]})"
+                    ctk.CTkLabel(record_frame, text=header_text,
+                                font=ctk.CTkFont(weight="bold")).pack(anchor="w", padx=10, pady=5)
+                    
+                    # Diagnosis
+                    if record[2]:
+                        ctk.CTkLabel(record_frame, text=f"Diagnosis: {record[2]}",
+                                    wraplength=700).pack(anchor="w", padx=10, pady=2)
+                    
+                    # Notes
+                    if record[3]:
+                        ctk.CTkLabel(record_frame, text=f"Notes: {record[3]}",
+                                    wraplength=700).pack(anchor="w", padx=10, pady=2)
+                    
+                    # Separator
+                    ctk.CTkFrame(record_frame, height=1, fg_color="gray").pack(fill="x", padx=10, pady=5)
+            else:
+                messagebox.showinfo("No History", "No medical history found for this patient.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load patient history: {e}")
+
+    def show_admission_interface(self):
+        self.clear_content()
+        title = ctk.CTkLabel(self.content_frame, text="🏥 Admit Patient", font=ctk.CTkFont(size=28, weight="bold"))
+        title.pack(pady=(0, 20))
+        form_frame = ctk.CTkFrame(self.content_frame)
+        form_frame.pack(padx=50, pady=20, fill="x")
+        form_frame.grid_columnconfigure(1, weight=1)
+        # Patient selection
+        ctk.CTkLabel(form_frame, text="Patient ID:", font=ctk.CTkFont(size=14)).grid(row=1, column=0, padx=(20, 5), pady=10, sticky="w")
+        self.admit_patient_id = ctk.CTkEntry(form_frame, height=40)
+        self.admit_patient_id.grid(row=1, column=1, padx=(5, 20), pady=10, sticky="ew")
+        # Doctor selection
+        ctk.CTkLabel(form_frame, text="Doctor:", font=ctk.CTkFont(size=14)).grid(row=2, column=0, padx=(20, 5), pady=10, sticky="w")
+        self.admit_doctor_menu = ctk.CTkOptionMenu(form_frame, values=self.get_doctor_names(), height=40)
+        self.admit_doctor_menu.grid(row=2, column=1, padx=(5, 20), pady=10, sticky="ew")
+        # Bed selection
+        ctk.CTkLabel(form_frame, text="Room & Bed:", font=ctk.CTkFont(size=14)).grid(row=3, column=0, padx=(20, 5), pady=10, sticky="w")
+        self.admit_bed_menu = ctk.CTkOptionMenu(form_frame, values=self.get_available_beds(), height=40)
+        self.admit_bed_menu.grid(row=3, column=1, padx=(5, 20), pady=10, sticky="ew")
+        # Admission date
+        ctk.CTkLabel(form_frame, text="Admission Date:", font=ctk.CTkFont(size=14)).grid(row=4, column=0, padx=(20, 5), pady=10, sticky="w")
+        self.admit_date_entry = ctk.CTkEntry(form_frame, placeholder_text="YYYY-MM-DD", height=40)
+        self.admit_date_entry.grid(row=4, column=1, padx=(5, 20), pady=10, sticky="ew")
+        # Submit button
+        ctk.CTkButton(form_frame, text="Admit Patient", command=self.process_admit_patient,
+                     height=50, font=ctk.CTkFont(size=16, weight="bold")).grid(
+            row=5, column=0, columnspan=2, padx=20, pady=30, sticky="ew"
+        )
+
+    def get_doctor_names(self):
+        try:
+            conn = connect_db()
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT doctor_id, first_name, last_name FROM Doctor")
+                doctors = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                return [f"{doc[0]} - {doc[1]} {doc[2]}" for doc in doctors]
+        except Exception:
+            return []
+        return []
+
+    def get_available_beds(self):
+        try:
+            conn = connect_db()
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT room_number, bed_number FROM Bed WHERE is_occupied=0")
+                beds = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                return [f"{bed[0]}-{bed[1]}" for bed in beds]
+        except Exception:
+            return []
+        return []
+
+    def process_admit_patient(self):
+        patient_id = self.admit_patient_id.get().strip()
+        doctor_str = self.admit_doctor_menu.get().strip()
+        bed_str = self.admit_bed_menu.get().strip()
+        admission_date = self.admit_date_entry.get().strip()
+        if not all([patient_id, doctor_str, bed_str, admission_date]):
+            messagebox.showerror("Error", "Please fill all fields")
+            return
+        if not self.validate_date(admission_date):
+            messagebox.showerror("Error", "Invalid date format (YYYY-MM-DD)")
+            return
+        try:
+            doctor_id = int(doctor_str.split("-")[0])
+            room_number, bed_number = bed_str.split("-")
+            conn = connect_db()
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("EXEC AdmitPatient @patient_id=?, @room_number=?, @bed_number=?, @doctor_id=?, @admission_date=?",
+                               (int(patient_id), room_number, bed_number, doctor_id, admission_date))
+                conn.commit()
+                messagebox.showinfo("Success", "Patient admitted successfully!")
+                cursor.close()
+                conn.close()
+                # Refresh bed and doctor lists
+                self.show_admission_interface()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to admit patient: {e}")
+
+    def show_appointments(self):
+        self.clear_content()
+        title = ctk.CTkLabel(self.content_frame, text="📅 Appointments", font=ctk.CTkFont(size=28, weight="bold"))
+        title.pack(pady=(0, 20))
+        search_frame = ctk.CTkFrame(self.content_frame)
+        search_frame.pack(fill="x", padx=20, pady=(0, 10))
+        ctk.CTkLabel(search_frame, text="Search by Patient or Doctor Name:").pack(side="left", padx=10)
+        self.appt_search_entry = ctk.CTkEntry(search_frame, width=200)
+        self.appt_search_entry.pack(side="left", padx=10)
+        ctk.CTkButton(search_frame, text="Search", command=self.filter_appointments).pack(side="left", padx=10)
+        ctk.CTkButton(search_frame, text="Clear", command=self.load_appointments).pack(side="left", padx=10)
+        self.appointments_table = ctk.CTkFrame(self.content_frame)
+        self.appointments_table.pack(fill="both", expand=True, padx=20, pady=20)
+        self.load_appointments()
+
+    def load_appointments(self, search_query=None):
+        for widget in self.appointments_table.winfo_children():
+            widget.destroy()
+        try:
+            conn = connect_db()
+            if conn:
+                cursor = conn.cursor()
+                base_query = """
+                    SELECT a.appointment_id, a.patient_id, p.first_name, p.last_name, a.doctor_id, d.first_name, d.last_name, a.appointment_date, a.status
+                    FROM Appointment a
+                    JOIN Patient p ON a.patient_id = p.patient_id
+                    JOIN Doctor d ON a.doctor_id = d.doctor_id
+                """
+                params = []
+                if search_query:
+                    base_query += " WHERE (p.first_name LIKE ? OR p.last_name LIKE ? OR d.first_name LIKE ? OR d.last_name LIKE ?)"
+                    params = [f"%{search_query}%"] * 4
+                base_query += " ORDER BY a.appointment_date DESC"
+                cursor.execute(base_query, params)
+                appointments = cursor.fetchall()
+                cursor.close()
+                conn.close()
+        except Exception as e:
+            appointments = []
+        columns = ["ID", "Patient", "Doctor", "Date", "Status"]
+        widths = [60, 180, 180, 120, 100]
+        for i, (col, width) in enumerate(zip(columns, widths)):
+            self.appointments_table.grid_columnconfigure(i, minsize=width)
+            ctk.CTkLabel(self.appointments_table, text=col, font=ctk.CTkFont(weight="bold"), text_color="white").grid(row=0, column=i, padx=5, pady=5, sticky="ew")
+        if appointments:
+            for row_idx, appt in enumerate(appointments, 1):
+                row_values = [
+                    str(appt[0]),
+                    f"{appt[2]} {appt[3]}",
+                    f"{appt[5]} {appt[6]}",
+                    str(appt[7]),
+                    appt[8]
+                ]
+                for col_idx, value in enumerate(row_values):
+                    ctk.CTkLabel(self.appointments_table, text=value).grid(row=row_idx, column=col_idx, padx=5, pady=2, sticky="ew")
+        else:
+            ctk.CTkLabel(self.appointments_table, text="No appointments found.").grid(row=1, column=0, columnspan=len(columns), pady=50)
+
+    def filter_appointments(self):
+        query = self.appt_search_entry.get().strip()
+        self.load_appointments(search_query=query)
+
+    def show_admitted_patients(self):
+        self.clear_content()
+        title = ctk.CTkLabel(self.content_frame, text="🏥 Admitted Patients", font=ctk.CTkFont(size=28, weight="bold"))
+        title.pack(pady=(0, 20))
+        search_frame = ctk.CTkFrame(self.content_frame)
+        search_frame.pack(fill="x", padx=20, pady=(0, 10))
+        ctk.CTkLabel(search_frame, text="Search by Patient or Doctor Name:").pack(side="left", padx=10)
+        self.admit_search_entry = ctk.CTkEntry(search_frame, width=200)
+        self.admit_search_entry.pack(side="left", padx=10)
+        ctk.CTkButton(search_frame, text="Search", command=self.filter_admitted_patients).pack(side="left", padx=10)
+        ctk.CTkButton(search_frame, text="Clear", command=lambda: self.load_admitted_patients()).pack(side="left", padx=10)
+        self.admitted_table = ctk.CTkFrame(self.content_frame)
+        self.admitted_table.pack(fill="both", expand=True, padx=20, pady=20)
+        self.load_admitted_patients()
+
+    def load_admitted_patients(self, search_query=None):
+        for widget in self.admitted_table.winfo_children():
+            widget.destroy()
+        try:
+            conn = connect_db()
+            if conn:
+                cursor = conn.cursor()
+                base_query = """
+                    SELECT a.admission_id, p.patient_id, p.first_name, p.last_name, a.room_number, a.bed_number, a.admission_date, a.doctor_id, d.first_name, d.last_name
+                    FROM Admission a
+                    JOIN Patient p ON a.patient_id = p.patient_id
+                    JOIN Doctor d ON a.doctor_id = d.doctor_id
+                    WHERE a.discharge_date IS NULL
+                """
+                params = []
+                if search_query:
+                    base_query += " AND (p.first_name LIKE ? OR p.last_name LIKE ? OR d.first_name LIKE ? OR d.last_name LIKE ?)"
+                    params = [f"%{search_query}%"] * 4
+                base_query += " ORDER BY a.admission_date DESC"
+                cursor.execute(base_query, params)
+                admissions = cursor.fetchall()
+                cursor.close()
+                conn.close()
+        except Exception as e:
+            admissions = []
+        columns = ["Admission ID", "Patient", "Room", "Bed", "Doctor", "Admitted On", "Actions"]
+        widths = [80, 180, 80, 80, 180, 120, 100]
+        for i, (col, width) in enumerate(zip(columns, widths)):
+            self.admitted_table.grid_columnconfigure(i, minsize=width)
+            ctk.CTkLabel(self.admitted_table, text=col, font=ctk.CTkFont(weight="bold"), text_color="white").grid(row=0, column=i, padx=5, pady=5, sticky="ew")
+        if admissions:
+            for row_idx, adm in enumerate(admissions, 1):
+                row_values = [
+                    str(adm[0]),
+                    f"{adm[2]} {adm[3]} (ID: {adm[1]})",
+                    str(adm[4]),
+                    str(adm[5]),
+                    f"{adm[8]} {adm[9]} (ID: {adm[7]})",
+                    str(adm[6])
+                ]
+                for col_idx, value in enumerate(row_values):
+                    ctk.CTkLabel(self.admitted_table, text=value).grid(row=row_idx, column=col_idx, padx=5, pady=2, sticky="ew")
+                ctk.CTkButton(self.admitted_table, text="Discharge", command=lambda a_id=adm[0]: self.discharge_patient(a_id)).grid(row=row_idx, column=len(columns)-1, padx=5, pady=2, sticky="ew")
+        else:
+            ctk.CTkLabel(self.admitted_table, text="No patients are currently admitted.").grid(row=1, column=0, columnspan=len(columns), pady=50)
+
+    def filter_admitted_patients(self):
+        query = self.admit_search_entry.get().strip()
+        self.load_admitted_patients(search_query=query)
+
+    def discharge_patient(self, admission_id):
+        try:
+            conn = connect_db()
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("EXEC DischargePatient @admission_id=?, @discharge_date=?", (admission_id, datetime.now().date()))
+                conn.commit()
+                cursor.close()
+                conn.close()
+                messagebox.showinfo("Success", "Patient discharged successfully!")
+                self.load_admitted_patients()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to discharge patient: {e}")
+    

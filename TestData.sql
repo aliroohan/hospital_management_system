@@ -93,29 +93,6 @@ INSERT INTO Bed (room_number, bed_number, is_occupied) VALUES
 -- Surgery recovery beds
 ('601', '1', 1), ('601', '2', 0);
 
--- 7. Insert Pharmacy (Medicines)
-INSERT INTO Pharmacy (name, stock_quantity, unit_price, expiry_date) VALUES
-('Aspirin 100mg', 500, 0.50, '2026-12-31'),
-('Paracetamol 500mg', 750, 0.25, '2025-08-15'),
-('Amoxicillin 250mg', 200, 2.50, '2025-11-30'),
-('Ibuprofen 400mg', 300, 1.25, '2026-03-20'),
-('Metformin 500mg', 400, 1.80, '2025-09-10'),
-('Lisinopril 10mg', 150, 3.50, '2026-01-25'),
-('Omeprazole 20mg', 250, 2.75, '2025-12-18'),
-('Simvastatin 20mg', 180, 4.20, '2026-02-14'),
-('Amlodipine 5mg', 220, 2.10, '2025-10-05'),
-('Hydrochlorothiazide 25mg', 160, 1.90, '2026-04-12'),
-('Warfarin 5mg', 80, 5.50, '2025-07-22'),
-('Prednisone 10mg', 120, 3.25, '2026-05-08'),
-('Azithromycin 250mg', 100, 8.75, '2025-06-30'),
-('Clopidogrel 75mg', 90, 12.50, '2026-08-17'),
-('Losartan 50mg', 200, 4.80, '2025-11-11'),
-('Insulin Glargine', 50, 85.00, '2025-09-25'),
-('Levothyroxine 50mcg', 300, 2.30, '2026-01-08'),
-('Gabapentin 300mg', 150, 6.40, '2025-12-03'),
-('Ciprofloxacin 500mg', 75, 4.90, '2026-03-15'),
-('Morphine 10mg', 30, 25.00, '2025-08-28');
-
 -- 8. Insert Appointments
 INSERT INTO Appointment (patient_id, doctor_id, appointment_date, status, remarks) VALUES
 (1, 1, '2024-06-15 09:00:00', 'completed', 'Regular checkup'),
@@ -148,36 +125,6 @@ INSERT INTO Medical_Record (patient_id, doctor_id, visit_date, diagnosis, notes)
 (9, 10, '2024-06-05', 'Eczema', 'Chronic inflammatory skin condition. Topical corticosteroids prescribed.'),
 (12, 13, '2024-06-10', 'Asthma', 'Childhood asthma. Inhaler therapy initiated.'),
 (14, 15, '2024-06-12', 'Chest pain - non-cardiac', 'Chest pain ruled out for cardiac cause. Musculoskeletal origin suspected.');
-
--- 10. Insert Prescription Medicine
-INSERT INTO Prescription_Medicine (record_id, medicine_id, dosage, duration, instructions) VALUES
--- For Hypertension patient (record_id 1)
-(1, 6, '10mg once daily', '30 days', 'Take in the morning with food'),
-(1, 1, '81mg once daily', '30 days', 'Take as cardioprotective therapy'),
--- For Migraine patient (record_id 2)
-(2, 4, '400mg as needed', '10 days', 'Take at onset of headache, max 3 times daily'),
--- For Emergency patient (record_id 3)
-(3, 3, '500mg twice daily', '7 days', 'Take after surgery to prevent infection'),
-(3, 20, '10mg every 4 hours', '3 days', 'For post-operative pain management'),
--- For Gynecology patient (record_id 4)
-(4, 2, '500mg every 6 hours', '5 days', 'Complete full course as prescribed'),
--- For Neuropathy patient (record_id 5)
-(5, 18, '300mg three times daily', '30 days', 'Take with food to reduce stomach upset'),
--- For Diabetes patient (record_id 6)
-(6, 5, '500mg twice daily', '30 days', 'Take with meals to reduce GI effects'),
--- For MI patient (record_id 7)
-(7, 14, '75mg once daily', '30 days', 'Blood thinner - take same time daily'),
-(7, 11, '5mg once daily', '30 days', 'Monitor INR levels regularly'),
--- For Arthritis patient (record_id 8)
-(8, 4, '400mg twice daily', '14 days', 'Take with food to prevent stomach upset'),
--- For URI patient (record_id 9)
-(9, 2, '500mg every 6 hours', '5 days', 'Complete full course of treatment'),
--- For Eczema patient (record_id 10)
-(10, 12, '10mg once daily', '7 days', 'Apply topical treatment as directed'),
--- For Asthma patient (record_id 11)
-(11, 13, '250mg once daily', '5 days', 'Use inhaler as rescue medication'),
--- For Chest pain patient (record_id 12)
-(12, 4, '400mg as needed', '7 days', 'Take for pain relief, max 3 times daily');
 
 -- 11. Insert Admissions
 INSERT INTO Admission (patient_id, room_number, bed_number, doctor_id, admission_date, discharge_date) VALUES
@@ -299,7 +246,6 @@ PRINT '- Beds: 32 records';
 PRINT '- Medicines: 20 records';
 PRINT '- Appointments: 15 records';
 PRINT '- Medical Records: 12 records';
-PRINT '- Prescriptions: 19 records';
 PRINT '- Admissions: 14 records';
 PRINT '- Bills: 13 records';
 PRINT '- Bill Items: 40+ records';

@@ -93,7 +93,7 @@ class AuthInterface:
         
         # Role selection
         ctk.CTkLabel(signup_frame, text="Role:", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", pady=(0, 5))
-        self.signup_role = ctk.CTkOptionMenu(signup_frame, values=["Admin", "Appointment", "Patient", "Pharmacist"], height=40)
+        self.signup_role = ctk.CTkOptionMenu(signup_frame, values=["Admin", "Appointment", "Patient"], height=40)
         self.signup_role.pack(fill="x", pady=(0, 20))
         
         # Signup button

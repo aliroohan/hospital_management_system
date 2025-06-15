@@ -1475,4 +1475,61 @@ class AdminModule:
             SET room_number=?, bed_number=?, is_occupied=?
             WHERE room_number=? AND bed_number=?
         """, (room_number, bed_number, is_occupied, room_number, bed_number))
-        conn.commit() 
+        conn.commit()
+
+    def show_department_statistics(self, department_id):
+        """Display detailed statistics for a department"""
+        try:
+            stats = get_department_statistics(department_id)
+            if stats:
+                # Create a new window for statistics
+                stats_window = ctk.CTkToplevel(self.main_frame)
+                stats_window.title("Department Statistics")
+                stats_window.geometry("600x400")
+                
+                # Main frame
+                main_frame = ctk.CTkFrame(stats_window)
+                main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+                
+                # Title
+                ctk.CTkLabel(main_frame, text=f"Statistics for {stats[0]}", 
+                            font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(0, 30))
+                
+                # Statistics cards
+                stats_frame = ctk.CTkFrame(main_frame)
+                stats_frame.pack(fill="x", padx=20, pady=10)
+                stats_frame.grid_columnconfigure((0, 1, 2), weight=1)
+                
+                # Total Doctors
+                doc_card = ctk.CTkFrame(stats_frame, fg_color="#3498db")
+                doc_card.grid(row=0, column=0, padx=10, pady=20, sticky="ew")
+                ctk.CTkLabel(doc_card, text=str(stats[1]), 
+                            font=ctk.CTkFont(size=24, weight="bold"),
+                            text_color="white").pack(pady=(15, 5))
+                ctk.CTkLabel(doc_card, text="Total Doctors",
+                            text_color="white").pack(pady=(0, 15))
+                
+                # Total Appointments
+                appt_card = ctk.CTkFrame(stats_frame, fg_color="#2ecc71")
+                appt_card.grid(row=0, column=1, padx=10, pady=20, sticky="ew")
+                ctk.CTkLabel(appt_card, text=str(stats[2]),
+                            font=ctk.CTkFont(size=24, weight="bold"),
+                            text_color="white").pack(pady=(15, 5))
+                ctk.CTkLabel(appt_card, text="Total Appointments",
+                            text_color="white").pack(pady=(0, 15))
+                
+                # Total Medical Records
+                record_card = ctk.CTkFrame(stats_frame, fg_color="#e67e22")
+                record_card.grid(row=0, column=2, padx=10, pady=20, sticky="ew")
+                ctk.CTkLabel(record_card, text=str(stats[3]),
+                            font=ctk.CTkFont(size=24, weight="bold"),
+                            text_color="white").pack(pady=(15, 5))
+                ctk.CTkLabel(record_card, text="Medical Records",
+                            text_color="white").pack(pady=(0, 15))
+                
+                # Close button
+                ctk.CTkButton(main_frame, text="Close", command=stats_window.destroy).pack(pady=20)
+            else:
+                messagebox.showinfo("No Data", "No statistics available for this department.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load department statistics: {e}") 

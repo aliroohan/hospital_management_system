@@ -191,33 +191,72 @@ def mark_bill_paid(bill_id):
             conn.close()
 
 def admit_patient(patient_id, room_number, bed_number, doctor_id, admission_date):
-    conn = connect_db()
-    if conn:
-        try:
+    """Admit a patient to the hospital"""
+    try:
+        conn = connect_db()
+        if conn:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO Admission (patient_id, room_number, bed_number, doctor_id, admission_date)
                 VALUES (?, ?, ?, ?, ?)
             """, (patient_id, room_number, bed_number, doctor_id, admission_date))
+            
+            # Update bed status
+            cursor.execute("""
+                UPDATE Bed 
+                SET is_occupied = 1 
+                WHERE room_number = ? AND bed_number = ?
+            """, (room_number, bed_number))
+            
             conn.commit()
-        except Exception as e:
-            raise e
-        finally:
+            return True
+    except Exception as e:
+        print(f"Error admitting patient: {e}")
+        return False
+    finally:
+        if conn:
             cursor.close()
             conn.close()
 
 def discharge_patient(admission_id, discharge_date):
-    conn = connect_db()
-    if conn:
-        try:
+    """Discharge a patient from the hospital"""
+    try:
+        conn = connect_db()
+        if conn:
             cursor = conn.cursor()
+            
+            # Get room and bed numbers
             cursor.execute("""
-                EXEC DischargePatient @AdmissionID=?, @DischargeDate=?
-            """, (admission_id, discharge_date))
-            conn.commit()
-        except Exception as e:
-            raise e
-        finally:
+                SELECT room_number, bed_number 
+                FROM Admission 
+                WHERE admission_id = ? AND discharge_date IS NULL
+            """, (admission_id,))
+            result = cursor.fetchone()
+            
+            if result:
+                room_number, bed_number = result
+                
+                # Update admission record
+                cursor.execute("""
+                    UPDATE Admission 
+                    SET discharge_date = ? 
+                    WHERE admission_id = ?
+                """, (discharge_date, admission_id))
+                
+                # Update bed status
+                cursor.execute("""
+                    UPDATE Bed 
+                    SET is_occupied = 0 
+                    WHERE room_number = ? AND bed_number = ?
+                """, (room_number, bed_number))
+                
+                conn.commit()
+                return True
+    except Exception as e:
+        print(f"Error discharging patient: {e}")
+        return False
+    finally:
+        if conn:
             cursor.close()
             conn.close()
 
@@ -350,19 +389,26 @@ def get_patient_appointments(patient_id):
     return []
 
 def get_available_beds():
-    conn = connect_db()
-    if conn:
-        try:
+    """Get list of available beds"""
+    try:
+        conn = connect_db()
+        if conn:
             cursor = conn.cursor()
-            cursor.execute("EXEC GetAvailableBeds")
+            cursor.execute("""
+                SELECT r.room_number, r.bed_number, r.room_type, r.daily_rate
+                FROM Room r
+                JOIN Bed b ON r.room_number = b.room_number AND r.bed_number = b.bed_number
+                WHERE b.is_occupied = 0
+                ORDER BY r.room_number, r.bed_number
+            """)
             return cursor.fetchall()
-        except Exception as e:
-            print(f"Error: {e}")
-            return []
-        finally:
+    except Exception as e:
+        print(f"Error getting available beds: {e}")
+        return []
+    finally:
+        if conn:
             cursor.close()
             conn.close()
-    return []
 
 def update_patient(patient_id, first_name, last_name, dob, gender, phone, address):
     conn = connect_db()
@@ -998,5 +1044,107 @@ def get_admission_details(admission_id):
             print(f"Error: {e}")
             return None
         finally:
+            cursor.close()
+            conn.close()
+
+def get_patient_history(patient_id):
+    """Get complete medical history for a patient"""
+    conn = connect_db()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("EXEC GetPatientHistory @patient_id=?", (patient_id,))
+            records = cursor.fetchall()
+            return records
+        except Exception as e:
+            print(f"Error getting patient history: {e}")
+            return None
+        finally:
+            cursor.close()
+            conn.close()
+    return None
+
+def get_doctor_schedule(doctor_id, start_date, end_date):
+    """Get doctor's schedule for a date range"""
+    conn = connect_db()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("EXEC GetDoctorSchedule @doctor_id=?, @start_date=?, @end_date=?", 
+                         (doctor_id, start_date, end_date))
+            schedule = cursor.fetchall()
+            return schedule
+        except Exception as e:
+            print(f"Error getting doctor schedule: {e}")
+            return None
+        finally:
+            cursor.close()
+            conn.close()
+    return None
+
+def get_department_statistics(department_id):
+    """Get statistics for a department"""
+    conn = connect_db()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("EXEC GetDepartmentStatistics @department_id=?", (department_id,))
+            stats = cursor.fetchone()
+            return stats
+        except Exception as e:
+            print(f"Error getting department statistics: {e}")
+            return None
+        finally:
+            cursor.close()
+            conn.close()
+    return None
+
+def get_patient_admission_history(patient_id):
+    """Get admission history for a patient"""
+    try:
+        conn = connect_db()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT a.admission_id, a.admission_date, a.discharge_date,
+                       r.room_number, r.bed_number, d.first_name, d.last_name
+                FROM Admission a
+                JOIN Room r ON a.room_number = r.room_number
+                JOIN Doctor d ON a.doctor_id = d.doctor_id
+                WHERE a.patient_id = ?
+                ORDER BY a.admission_date DESC
+            """, (patient_id,))
+            return cursor.fetchall()
+    except Exception as e:
+        print(f"Error getting admission history: {e}")
+        return []
+    finally:
+        if conn:
+            cursor.close()
+            conn.close()
+
+def get_current_admissions():
+    """Get all current admissions"""
+    try:
+        conn = connect_db()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT a.admission_id, p.first_name, p.last_name, 
+                       r.room_number, r.bed_number, a.admission_date,
+                       d.first_name as doctor_first_name, d.last_name as doctor_last_name
+                FROM Admission a
+                JOIN Patient p ON a.patient_id = p.patient_id
+                JOIN Room r ON a.room_number = r.room_number
+                JOIN Doctor d ON a.doctor_id = d.doctor_id
+                WHERE a.discharge_date IS NULL
+                ORDER BY a.admission_date DESC
+            """)
+            return cursor.fetchall()
+    except Exception as e:
+        print(f"Error getting current admissions: {e}")
+        return []
+    finally:
+        if conn:
             cursor.close()
             conn.close()

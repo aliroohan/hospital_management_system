@@ -6,7 +6,7 @@ A comprehensive hospital management system built with Python and CustomTkinter, 
 
 ### 🔐 Authentication System
 - User registration and login
-- Role-based access control (Admin, Patient, Appointment, Pharmacist)
+- Role-based access control (Admin, Patient, Appointment)
 - Secure password hashing
 
 ### 👨‍💼 Admin Module
@@ -29,13 +29,6 @@ A comprehensive hospital management system built with Python and CustomTkinter, 
 - Patient and doctor browser
 - Appointment status tracking
 - Today's schedule overview
-
-### 💊 Pharmacy Module
-- Medicine inventory management
-- Stock tracking and alerts
-- Prescription management
-- Expiry date monitoring
-- Billing integration
 
 ## 🚀 Quick Start
 
@@ -115,12 +108,6 @@ def connect_db():
 - Handle appointment conflicts
 - View daily schedules
 
-### 💊 Pharmacist
-- Manage medicine inventory
-- Track stock levels
-- Handle prescriptions
-- Monitor expiry dates
-
 ## 🔧 Configuration
 
 ### Theme Settings
@@ -148,7 +135,6 @@ Hospital-Management-System/
 ├── admin_module.py               # Admin functionality
 ├── patient_module.py             # Patient management
 ├── appointment_module.py         # Appointment scheduling
-├── pharmacy_module.py            # Pharmacy management
 ├── db_connect.py                 # Database operations
 ├── HospitalManagementSystem_Corrected.sql  # Database schema
 ├── setup.py                      # Setup script
