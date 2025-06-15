@@ -998,7 +998,6 @@ class AdminModule:
                     
                     ctk.CTkButton(actions_frame, text="✏️", width=30, height=24,
                                  command=lambda r=room: self.edit_room(r)).grid(row=0, column=0, padx=2)
-                
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load rooms: {e}")
         finally:
@@ -1050,7 +1049,6 @@ class AdminModule:
                     conn.close()
         ctk.CTkButton(scroll_frame, text="Update", command=update_room).pack(pady=20)
     
-
     def show_bed_management(self):
         self.clear_content()
         
@@ -1212,8 +1210,6 @@ class AdminModule:
                     
                     ctk.CTkButton(actions_frame, text="✏️", width=30, height=24,
                                  command=lambda b=bed: self.edit_bed(b)).grid(row=0, column=0, padx=2)
-                    ctk.CTkButton(actions_frame, text="🗑️", width=30, height=24,
-                                 command=lambda id=(bed[0], bed[2]): self.delete_bed(id)).grid(row=0, column=1, padx=2)
                 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load beds: {e}")
@@ -1264,22 +1260,6 @@ class AdminModule:
                     conn.close()
         ctk.CTkButton(scroll_frame, text="Update", command=update_bed).pack(pady=20)
     
-    def delete_bed(self, bed_id):
-        if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this bed?"):
-            try:
-                conn = connect_db()
-                if conn:
-                    cursor = conn.cursor()
-                    cursor.execute("DELETE FROM Bed WHERE bed_id = ?", (bed_id,))
-                    conn.commit()
-                    messagebox.showinfo("Success", "Bed deleted successfully!")
-                    self.load_beds()
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to delete bed: {e}")
-            finally:
-                if conn:
-                    cursor.close()
-                    conn.close()
     
     def show_department_management(self):
         self.clear_content()
@@ -1373,11 +1353,11 @@ class AdminModule:
                     actions_frame.grid(row=row_idx, column=len(columns)-1, padx=5, pady=2, sticky="ew")
                     actions_frame.grid_columnconfigure(0, weight=1)
                     actions_frame.grid_columnconfigure(1, weight=1)
-                    
+                    actions_frame.grid_columnconfigure(2, weight=1)
                     ctk.CTkButton(actions_frame, text="✏️", width=30, height=24,
                                  command=lambda d=dept: self.edit_department(d)).grid(row=0, column=0, padx=2)
-                    ctk.CTkButton(actions_frame, text="🗑️", width=30, height=24,
-                                 command=lambda id=dept[0]: self.delete_department(id)).grid(row=0, column=1, padx=2)
+                    ctk.CTkButton(actions_frame, text="📊 Stats", width=60, height=24,
+                                 command=lambda id=dept[0]: self.show_department_statistics_window(id)).grid(row=0, column=2, padx=2)
                 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load departments: {e}")
@@ -1424,16 +1404,6 @@ class AdminModule:
         # Save button
         save_btn = ctk.CTkButton(dialog, text="Save", command=update_department)
         save_btn.pack(pady=20)
-    
-    def delete_department(self, dept_id):
-        if messagebox.askyesno("Confirm Delete", 
-                             "Are you sure you want to delete this department?"):
-            try:
-                delete_department(dept_id)
-                messagebox.showinfo("Success", "Department deleted successfully!")
-                self.load_departments()
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to delete department: {e}")
 
     def get_all_rooms(self):
         cursor.execute("""
@@ -1450,14 +1420,7 @@ class AdminModule:
         """, (room_type, bed_count, room_number))
         conn.commit()
 
-    def delete_room(self, room_number):
-        try:
-            cursor.execute("DELETE FROM Room WHERE room_number = ?", (room_number,))
-            conn.commit()
-            return True
-        except Exception as e:
-            print(f"Error deleting room: {e}")
-            return False
+
 
     def add_bed_to_db(self, room_number, bed_number):
         try:
@@ -1489,62 +1452,22 @@ class AdminModule:
         """, (room_number, bed_number, is_occupied, room_number, bed_number))
         conn.commit()
 
-    def show_department_statistics(self, department_id):
-        """Display detailed statistics for a department"""
-        try:
-            stats = get_department_statistics(department_id)
-            if stats:
-                # Create a new window for statistics
-                stats_window = ctk.CTkToplevel(self.main_frame)
-                stats_window.title("Department Statistics")
-                stats_window.geometry("600x400")
-                
-                # Main frame
-                main_frame = ctk.CTkFrame(stats_window)
-                main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-                
-                # Title
-                ctk.CTkLabel(main_frame, text=f"Statistics for {stats[0]}", 
-                            font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(0, 30))
-                
-                # Statistics cards
-                stats_frame = ctk.CTkFrame(main_frame)
-                stats_frame.pack(fill="x", padx=20, pady=10)
-                stats_frame.grid_columnconfigure((0, 1, 2), weight=1)
-                
-                # Total Doctors
-                doc_card = ctk.CTkFrame(stats_frame, fg_color="#3498db")
-                doc_card.grid(row=0, column=0, padx=10, pady=20, sticky="ew")
-                ctk.CTkLabel(doc_card, text=str(stats[1]), 
-                            font=ctk.CTkFont(size=24, weight="bold"),
-                            text_color="white").pack(pady=(15, 5))
-                ctk.CTkLabel(doc_card, text="Total Doctors",
-                            text_color="white").pack(pady=(0, 15))
-                
-                # Total Appointments
-                appt_card = ctk.CTkFrame(stats_frame, fg_color="#2ecc71")
-                appt_card.grid(row=0, column=1, padx=10, pady=20, sticky="ew")
-                ctk.CTkLabel(appt_card, text=str(stats[2]),
-                            font=ctk.CTkFont(size=24, weight="bold"),
-                            text_color="white").pack(pady=(15, 5))
-                ctk.CTkLabel(appt_card, text="Total Appointments",
-                            text_color="white").pack(pady=(0, 15))
-                
-                # Total Medical Records
-                record_card = ctk.CTkFrame(stats_frame, fg_color="#e67e22")
-                record_card.grid(row=0, column=2, padx=10, pady=20, sticky="ew")
-                ctk.CTkLabel(record_card, text=str(stats[3]),
-                            font=ctk.CTkFont(size=24, weight="bold"),
-                            text_color="white").pack(pady=(15, 5))
-                ctk.CTkLabel(record_card, text="Medical Records",
-                            text_color="white").pack(pady=(0, 15))
-                
-                # Close button
-                ctk.CTkButton(main_frame, text="Close", command=stats_window.destroy).pack(pady=20)
-            else:
-                messagebox.showinfo("No Data", "No statistics available for this department.")
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to load department statistics: {e}")
+    def show_department_statistics_window(self, department_id):
+        from db_connect import get_department_statistics
+        stats = get_department_statistics(department_id)
+        dialog = ctk.CTkToplevel(self.content_frame)
+        dialog.title("Department Statistics")
+        dialog.geometry("400x350")
+        dialog.grab_set()
+        if stats:
+            dept_name, total_doctors, total_appointments, total_medical_records = stats
+            ctk.CTkLabel(dialog, text=f"Department: {dept_name}", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=(20, 10))
+            ctk.CTkLabel(dialog, text=f"Total Doctors: {total_doctors}", font=ctk.CTkFont(size=16)).pack(pady=10)
+            ctk.CTkLabel(dialog, text=f"Total Appointments: {total_appointments}", font=ctk.CTkFont(size=16)).pack(pady=10)
+            ctk.CTkLabel(dialog, text=f"Total Medical Records: {total_medical_records}", font=ctk.CTkFont(size=16)).pack(pady=10)
+        else:
+            ctk.CTkLabel(dialog, text="No statistics available for this department.", font=ctk.CTkFont(size=16)).pack(pady=40)
+        ctk.CTkButton(dialog, text="Close", command=dialog.destroy).pack(pady=20)
 
     def add_department(self):
         dialog = ctk.CTkToplevel(self.content_frame)
