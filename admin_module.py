@@ -1260,7 +1260,6 @@ class AdminModule:
                     conn.close()
         ctk.CTkButton(scroll_frame, text="Update", command=update_bed).pack(pady=20)
     
-    
     def show_department_management(self):
         self.clear_content()
         
@@ -1404,53 +1403,6 @@ class AdminModule:
         # Save button
         save_btn = ctk.CTkButton(dialog, text="Save", command=update_department)
         save_btn.pack(pady=20)
-
-    def get_all_rooms(self):
-        cursor.execute("""
-            SELECT room_number, room_type, bed_count
-            FROM Room
-        """)
-        return cursor.fetchall()
-
-    def update_room(self, room_number, room_type, bed_count):
-        cursor.execute("""
-            UPDATE Room
-            SET room_type=?, bed_count=?
-            WHERE room_number=?
-        """, (room_type, bed_count, room_number))
-        conn.commit()
-
-
-
-    def add_bed_to_db(self, room_number, bed_number):
-        try:
-            if not all([room_number, bed_number]):
-                return False
-            cursor.execute("""
-                INSERT INTO Bed (room_number, bed_number, is_occupied)
-                VALUES (?, ?, 0)
-            """, (room_number, bed_number))
-            conn.commit()
-            return True
-        except Exception as e:
-            print(f"Error adding bed: {e}")
-            return False
-
-    def get_all_beds(self):
-        cursor.execute("""
-            SELECT b.room_number, r.room_number, b.bed_number, b.is_occupied
-            FROM Bed b
-            LEFT JOIN Room r ON b.room_number = r.room_number
-        """)
-        return cursor.fetchall()
-
-    def update_bed(self, room_number, bed_number, is_occupied):
-        cursor.execute("""
-            UPDATE Bed
-            SET room_number=?, bed_number=?, is_occupied=?
-            WHERE room_number=? AND bed_number=?
-        """, (room_number, bed_number, is_occupied, room_number, bed_number))
-        conn.commit()
 
     def show_department_statistics_window(self, department_id):
         from db_connect import get_department_statistics

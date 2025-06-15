@@ -293,22 +293,6 @@ def update_bed(room_number, bed_number, is_occupied):
             cursor.close()
             conn.close()
 
-def delete_bed(room_number, bed_number):
-    conn = connect_db()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            cursor.execute("""
-                DELETE FROM Bed
-                WHERE room_number=? AND bed_number=?
-            """, (room_number, bed_number))
-            conn.commit()
-        except Exception as e:
-            raise e
-        finally:
-            cursor.close()
-            conn.close()
-
 def get_beds():
     conn = connect_db()
     if conn:
@@ -536,23 +520,6 @@ def update_room(room_number, room_type, max_beds, status):
             cursor.close()
             conn.close()
 
-def delete_room(room_number):
-    conn = connect_db()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM Bed WHERE room_number=?", (room_number,))
-            if cursor.fetchone()[0] > 0:
-                return False
-            cursor.execute("DELETE FROM Room WHERE room_number=?", (room_number,))
-            conn.commit()
-            return True
-        except Exception as e:
-            raise e
-        finally:
-            cursor.close()
-            conn.close()
-
 def update_department(dept_id, dept_name):
     conn = connect_db()
     if conn:
@@ -563,19 +530,6 @@ def update_department(dept_id, dept_name):
                 SET name=?
                 WHERE department_id=?
             """, (dept_name, dept_id))
-            conn.commit()
-        except Exception as e:
-            raise e
-        finally:
-            cursor.close()
-            conn.close()
-
-def delete_department(dept_id):
-    conn = connect_db()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM Department WHERE department_id=?", (dept_id,))
             conn.commit()
         except Exception as e:
             raise e
@@ -831,44 +785,6 @@ def add_department(name, location):
             cursor.close()
             conn.close()
 
-def update_department(dept_id, dept_name):
-    conn = connect_db()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE Department 
-                SET name=?
-                WHERE department_id=?
-            """, (dept_name, dept_id))
-            conn.commit()
-        except Exception as e:
-            raise e
-        finally:
-            cursor.close()
-            conn.close()
-
-def delete_department(dept_id):
-    conn = connect_db()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            cursor.execute("""
-                IF EXISTS (SELECT 1 FROM Doctor WHERE department_id = ?) OR 
-                   EXISTS (SELECT 1 FROM Staff WHERE department_id = ?)
-                BEGIN
-                    RAISERROR ('Cannot delete department with existing doctors or staff', 16, 1)
-                    RETURN
-                END
-                DELETE FROM Department WHERE department_id = ?
-            """, (dept_id, dept_id, dept_id))
-            conn.commit()
-        except Exception as e:
-            raise e
-        finally:
-            cursor.close()
-            conn.close()
-
 def get_staff():
     conn = connect_db()
     if conn:
@@ -915,19 +831,6 @@ def update_staff(staff_id, first_name, last_name, role, shift, dept_id):
                 SET first_name=?, last_name=?, role=?, shift=?, department_id=?
                 WHERE staff_id=?
             """, (first_name, last_name, role, shift, dept_id, staff_id))
-            conn.commit()
-        except Exception as e:
-            raise e
-        finally:
-            cursor.close()
-            conn.close()
-
-def delete_staff(staff_id):
-    conn = connect_db()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM Staff WHERE staff_id=?", (staff_id,))
             conn.commit()
         except Exception as e:
             raise e
