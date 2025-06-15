@@ -5,6 +5,7 @@ from auth_interface import AuthInterface
 from admin_module import AdminModule
 from patient_module import PatientModule
 from appointment_module import AppointmentModule
+from billing_module import BillingModule
 from db_connect import ensure_database
 
 # Set appearance mode and default color theme
@@ -87,6 +88,8 @@ class HospitalManagementSystem:
             self.current_module = PatientModule(self.content_frame, self.current_user)
         elif role == "Appointment":
             self.current_module = AppointmentModule(self.content_frame, self.current_user)
+        elif role == "Billing":
+            self.current_module = BillingModule(self.content_frame, self.current_user)
         else:
             messagebox.showerror("Error", f"Unknown role: {role}")
             self.logout()

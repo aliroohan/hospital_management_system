@@ -51,7 +51,6 @@ class AppointmentModule:
             ("📋 Manage Appointments", self.show_manage_appointments),
             ("🔍 Search Appointments", self.show_search_appointments),
             ("📊 Appointment Reports", self.show_appointment_reports),
-            ("⏰ Today's Schedule", self.show_todays_schedule),
         ]
         
         for i, (text, command) in enumerate(buttons, 1):
@@ -166,7 +165,7 @@ class AppointmentModule:
                     FROM Appointment a
                     LEFT JOIN Patient p ON a.patient_id = p.patient_id
                     LEFT JOIN Doctor d ON a.doctor_id = d.doctor_id
-                    WHERE a.appointment_date >= GETDATE()
+                    WHERE a.appointment_date >= GETDATE() AND a.status = 'scheduled'
                     ORDER BY a.appointment_date ASC
                 """)
                 appointments = cursor.fetchall()
@@ -436,10 +435,8 @@ class AppointmentModule:
                     messagebox.showerror("Error", "Doctor already has an appointment at this time")
                     return
                 # Schedule the appointment
-                cursor.execute("""
-                    INSERT INTO Appointment (patient_id, doctor_id, appointment_date, status, remarks)
-                    VALUES (?, ?, ?, 'scheduled', ?)
-                """, (int(patient_id), int(doctor_id), app_datetime, remarks or None))
+                cursor.execute("EXEC BookAppointment @patient_id=?, @doctor_id=?, @appointment_date=?, @remarks=?",
+                             (int(patient_id), int(doctor_id), app_datetime, remarks or None))
                 conn.commit()
                 messagebox.showinfo("Success", "Appointment scheduled successfully!")
                 # Clear form
@@ -558,12 +555,16 @@ class AppointmentModule:
                     actions_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
                     actions_frame.grid(row=row_idx, column=len(columns)-1, padx=5, pady=2)
                     
-                    ctk.CTkButton(actions_frame, text="✏️", width=30, height=24,
-                                 command=lambda a=appointment: self.edit_appointment(a)).pack(side="left", padx=2)
-                    ctk.CTkButton(actions_frame, text="❌", width=30, height=24,
-                                 command=lambda a=appointment: self.cancel_appointment(a[0])).pack(side="left", padx=2)
-                    ctk.CTkButton(actions_frame, text="✅", width=30, height=24,
-                                 command=lambda a=appointment: self.complete_appointment(a[0])).pack(side="left", padx=2)
+                    # Only show action buttons for scheduled appointments
+                    if appointment[2] == "scheduled":
+                        ctk.CTkButton(actions_frame, text="❌", width=30, height=24,
+                                     command=lambda a=appointment: self.cancel_appointment(a[0])).pack(side="left", padx=2)
+                        ctk.CTkButton(actions_frame, text="✅", width=30, height=24,
+                                     command=lambda a=appointment: self.complete_appointment(a[0])).pack(side="left", padx=2)
+                    else:
+                        # Show status label for completed/cancelled appointments
+                        status_text = "✅ Completed" if appointment[2] == "completed" else "❌ Cancelled"
+                        ctk.CTkLabel(actions_frame, text=status_text).pack(side="left", padx=2)
                 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load appointments: {e}")

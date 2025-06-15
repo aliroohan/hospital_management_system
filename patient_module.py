@@ -226,10 +226,8 @@ class PatientModule:
             conn = connect_db()
             if conn:
                 cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO Patient (first_name, last_name, dob, gender, contact_number, email, address)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (first_name, last_name, dob, gender, contact, email or None, address))
+                cursor.execute("EXEC RegisterPatient @first_name=?, @last_name=?, @dob=?, @gender=?, @contact_number=?, @email=?, @address=?",
+                             (first_name, last_name, dob, gender, contact, email or None, address))
                 conn.commit()
                 messagebox.showinfo("Success", "Patient registered successfully!")
                 # Clear form
@@ -373,14 +371,7 @@ class PatientModule:
             conn = connect_db()
             if conn:
                 cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT mr.record_id, mr.visit_date, mr.diagnosis, mr.notes,
-                           d.first_name + ' ' + d.last_name as doctor_name
-                    FROM Medical_Record mr
-                    LEFT JOIN Doctor d ON mr.doctor_id = d.doctor_id
-                    WHERE mr.patient_id = ?
-                    ORDER BY mr.visit_date DESC
-                """, (patient_id,))
+                cursor.execute("EXEC GetPatientHistory @patient_id=?", (patient_id,))
                 records = cursor.fetchall()
                 
                 if records:
@@ -495,10 +486,8 @@ class PatientModule:
             conn = connect_db()
             if conn:
                 cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO Medical_Record (patient_id, doctor_id, visit_date, diagnosis, notes)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (int(patient_id), int(doctor_id), visit_date, diagnosis, notes or None))
+                cursor.execute("EXEC CreateMedicalRecord @patient_id=?, @doctor_id=?, @visit_date=?, @diagnosis=?, @notes=?",
+                             (int(patient_id), int(doctor_id), visit_date, diagnosis, notes or None))
                 conn.commit()
                 
                 messagebox.showinfo("Success", "Medical record added successfully!")

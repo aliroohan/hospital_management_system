@@ -272,9 +272,11 @@ class AdminModule:
                 columns = ["ID", "First Name", "Last Name", "Specialization", "Contact", "Email", "Department", "Actions"]
                 widths = [50, 100, 100, 120, 120, 150, 100, 120]
                 
-                # Create main table frame
-                table_frame = ctk.CTkFrame(self.doctor_table_scroll)
-                table_frame.pack(fill="both", expand=True, padx=5, pady=5)
+                # Create main table frame inside a horizontally scrollable frame
+                scroll_x_frame = ctk.CTkScrollableFrame(self.doctor_table_scroll, orientation="horizontal", height=400)
+                scroll_x_frame.pack(fill="both", expand=True, padx=5, pady=5)
+                table_frame = ctk.CTkFrame(scroll_x_frame, width=1100)  # Set width larger than visible area
+                table_frame.pack(fill="y", expand=False, padx=0, pady=0)
                 
                 # Configure grid columns with minimum widths
                 for i, width in enumerate(widths):
@@ -308,9 +310,12 @@ class AdminModule:
                     actions_frame.grid(row=row_idx, column=len(columns)-1, padx=5, pady=2, sticky="ew")
                     actions_frame.grid_columnconfigure(0, weight=1)
                     actions_frame.grid_columnconfigure(1, weight=1)
+                    actions_frame.grid_columnconfigure(2, weight=1)
                     
                     ctk.CTkButton(actions_frame, text="✏️", width=30, height=24,
                                  command=lambda d=doctor: self.edit_doctor(d)).grid(row=0, column=0, padx=2)
+                    ctk.CTkButton(actions_frame, text="📅 Schedule", width=80, height=24,
+                                 command=lambda d=doctor: self.show_doctor_schedule_window(d)).grid(row=0, column=1, padx=2)
                 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load doctors: {e}")
@@ -385,7 +390,64 @@ class AdminModule:
                     conn.close()
         ctk.CTkButton(scroll_frame, text="Update", command=update_doctor).pack(pady=20)
     
+    def show_doctor_schedule_window(self, doctor):
+        import datetime
+        from db_connect import get_doctor_schedule
+        dialog = ctk.CTkToplevel(self.main_frame)
+        dialog.title(f"Doctor Schedule - {doctor[1]} {doctor[2]}")
+        dialog.geometry("700x500")
+        dialog.grab_set()
 
+        ctk.CTkLabel(dialog, text=f"Doctor: {doctor[1]} {doctor[2]}", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=(20, 10))
+
+        # Date range selection
+        date_frame = ctk.CTkFrame(dialog)
+        date_frame.pack(pady=10)
+        ctk.CTkLabel(date_frame, text="Start Date (YYYY-MM-DD):").pack(side="left", padx=5)
+        start_entry = ctk.CTkEntry(date_frame, width=120)
+        start_entry.pack(side="left", padx=5)
+        ctk.CTkLabel(date_frame, text="End Date (YYYY-MM-DD):").pack(side="left", padx=5)
+        end_entry = ctk.CTkEntry(date_frame, width=120)
+        end_entry.pack(side="left", padx=5)
+        # Set default dates
+        today = datetime.date.today()
+        start_entry.insert(0, str(today))
+        end_entry.insert(0, str(today + datetime.timedelta(days=7)))
+
+        # Results frame
+        results_frame = ctk.CTkScrollableFrame(dialog, height=350)
+        results_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
+        def show_schedule():
+            # Clear previous results
+            for widget in results_frame.winfo_children():
+                widget.destroy()
+            start_date = start_entry.get().strip()
+            end_date = end_entry.get().strip()
+            try:
+                schedule = get_doctor_schedule(doctor[0], start_date, end_date)
+                # Table header
+                columns = ["Appointment ID", "Date & Time", "Status", "Patient Name", "Contact"]
+                widths = [100, 150, 100, 180, 120]
+                header = ctk.CTkFrame(results_frame, fg_color="#1f538d")
+                header.pack(fill="x", padx=5, pady=(5,0))
+                for i, (col, width) in enumerate(zip(columns, widths)):
+                    ctk.CTkLabel(header, text=col, font=ctk.CTkFont(weight="bold"), text_color="white", width=width-10).pack(side="left", padx=5)
+                if schedule:
+                    for appt in schedule:
+                        row = ctk.CTkFrame(results_frame)
+                        row.pack(fill="x", padx=5, pady=2)
+                        for i, (value, width) in enumerate(zip(appt, widths)):
+                            ctk.CTkLabel(row, text=str(value), width=width-10).pack(side="left", padx=5)
+                else:
+                    ctk.CTkLabel(results_frame, text="No appointments found for this period.").pack(pady=20)
+            except Exception as e:
+                ctk.CTkLabel(results_frame, text=f"Error loading schedule: {e}").pack(pady=20)
+
+        ctk.CTkButton(dialog, text="Show Schedule", command=show_schedule).pack(pady=10)
+        # Show initial schedule
+        show_schedule()
+    
     def show_staff_management(self):
         self.clear_content()
         
