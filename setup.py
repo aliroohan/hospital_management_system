@@ -33,7 +33,7 @@ def install_dependencies():
 def check_files():
     """Check if all required files exist"""
     required_files = [
-        'hospital_main.py',
+        'main.py',
         'auth_interface.py',
         'admin_module.py',
         'patient_module.py',
