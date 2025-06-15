@@ -272,39 +272,45 @@ class AdminModule:
                 columns = ["ID", "First Name", "Last Name", "Specialization", "Contact", "Email", "Department", "Actions"]
                 widths = [50, 100, 100, 120, 120, 150, 100, 120]
                 
-                header_frame = ctk.CTkFrame(self.doctor_table_scroll, fg_color="#1f538d")
-                header_frame.pack(fill="x", padx=5, pady=(5,0))
+                # Create main table frame
+                table_frame = ctk.CTkFrame(self.doctor_table_scroll)
+                table_frame.pack(fill="both", expand=True, padx=5, pady=5)
                 
-                for i, (col, width) in enumerate(zip(columns, widths)):
-                    header_frame.grid_columnconfigure(i, minsize=width)
-                    ctk.CTkLabel(header_frame, text=col, font=ctk.CTkFont(weight="bold"),
-                                text_color="white").grid(row=0, column=i, padx=5, pady=5, sticky="ew")
-                
-                # Create content frame
-                content_frame = ctk.CTkFrame(self.doctor_table_scroll)
-                content_frame.pack(fill="both", expand=True, padx=5, pady=(0,5))
-                
+                # Configure grid columns with minimum widths
                 for i, width in enumerate(widths):
-                    content_frame.grid_columnconfigure(i, minsize=width)
+                    table_frame.grid_columnconfigure(i, minsize=width)
                 
-                # Add rows
-                for row_idx, doctor in enumerate(doctors):
-                    values = [str(doctor[0]), doctor[1], doctor[2], doctor[3], doctor[4], 
-                             doctor[5] or "N/A", doctor[6] or "N/A"]
+                # Create header row
+                header_frame = ctk.CTkFrame(table_frame, fg_color="#1f538d")
+                header_frame.grid(row=0, column=0, columnspan=len(columns), sticky="ew", padx=5, pady=(5,0))
+                
+                # Configure header columns
+                for i, width in enumerate(widths):
+                    header_frame.grid_columnconfigure(i, minsize=width)
+                
+                # Add header labels
+                for i, (col, width) in enumerate(zip(columns, widths)):
+                    label = ctk.CTkLabel(header_frame, text=col, font=ctk.CTkFont(weight="bold"),
+                                       text_color="white", width=width-10)
+                    label.grid(row=0, column=i, padx=5, pady=5, sticky="ew")
+                
+                # Add data rows
+                for row_idx, doctor in enumerate(doctors, 1):
+                    values = [str(doctor[0]), doctor[1], doctor[2], doctor[3], 
+                             doctor[4] or "N/A", doctor[5] or "N/A", doctor[6] or "N/A"]
                     
                     for col_idx, (value, width) in enumerate(zip(values, widths[:-1])):
-                        ctk.CTkLabel(content_frame, text=value).grid(
-                            row=row_idx, column=col_idx, padx=5, pady=2, sticky="w"
-                        )
+                        label = ctk.CTkLabel(table_frame, text=value, width=width-10)
+                        label.grid(row=row_idx, column=col_idx, padx=5, pady=2, sticky="ew")
                     
                     # Action buttons
-                    actions_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-                    actions_frame.grid(row=row_idx, column=len(columns)-1, padx=5, pady=2)
+                    actions_frame = ctk.CTkFrame(table_frame, fg_color="transparent")
+                    actions_frame.grid(row=row_idx, column=len(columns)-1, padx=5, pady=2, sticky="ew")
+                    actions_frame.grid_columnconfigure(0, weight=1)
+                    actions_frame.grid_columnconfigure(1, weight=1)
                     
                     ctk.CTkButton(actions_frame, text="✏️", width=30, height=24,
-                                 command=lambda d=doctor: self.edit_doctor(d)).pack(side="left", padx=2)
-                    ctk.CTkButton(actions_frame, text="🗑️", width=30, height=24,
-                                 command=lambda d=doctor: self.delete_doctor(d[0])).pack(side="left", padx=2)
+                                 command=lambda d=doctor: self.edit_doctor(d)).grid(row=0, column=0, padx=2)
                 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load doctors: {e}")
@@ -314,11 +320,11 @@ class AdminModule:
                 conn.close()
     
     def edit_doctor(self, doctor):
-        # Create edit dialog
         dialog = ctk.CTkToplevel(self.main_frame)
         dialog.title("Edit Doctor")
-        dialog.geometry("400x500")
-        
+        dialog.geometry("400x600")
+        scroll_frame = ctk.CTkScrollableFrame(dialog)
+        scroll_frame.pack(fill="both", expand=True, padx=20, pady=20)
         fields = [
             ("First Name:", doctor[1]),
             ("Last Name:", doctor[2]),
@@ -327,34 +333,30 @@ class AdminModule:
             ("Email:", doctor[5] or ""),
             ("Department:", doctor[6] if len(doctor) > 6 else "")
         ]
-        
         entries = {}
         for i, (label, value) in enumerate(fields):
-            ctk.CTkLabel(dialog, text=label).pack(pady=(10, 5))
+            ctk.CTkLabel(scroll_frame, text=label).pack(pady=(10, 5))
             if label == "Department:":
                 from db_connect import get_departments
                 departments = get_departments()
                 dept_names = [f"{d[0]} - {d[1]}" for d in departments]
-                entry = ctk.CTkOptionMenu(dialog, values=dept_names, width=300)
+                entry = ctk.CTkOptionMenu(scroll_frame, values=dept_names, width=300)
                 if value:
                     entry.set(value)
                 else:
                     entry.set(dept_names[0] if dept_names else "")
             else:
-                entry = ctk.CTkEntry(dialog, width=300)
+                entry = ctk.CTkEntry(scroll_frame, width=300)
                 entry.insert(0, value)
             entry.pack(pady=(0, 10))
             entries[label] = entry
-        
         def update_doctor():
             try:
                 conn = connect_db()
                 if conn:
                     cursor = conn.cursor()
-                    # Get department_id from dropdown
                     dept_val = entries["Department:"].get()
                     dept_id = dept_val.split(" - ")[0] if dept_val else None
-                    # Check if department exists
                     cursor.execute("SELECT 1 FROM Department WHERE department_id = ?", (dept_id,))
                     if not cursor.fetchone():
                         messagebox.showerror("Error", f"Department ID '{dept_id}' does not exist. Please add the department first.")
@@ -381,26 +383,9 @@ class AdminModule:
                 if conn:
                     cursor.close()
                     conn.close()
-        
-        ctk.CTkButton(dialog, text="Update", command=update_doctor).pack(pady=20)
+        ctk.CTkButton(scroll_frame, text="Update", command=update_doctor).pack(pady=20)
     
-    def delete_doctor(self, doctor_id):
-        if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this doctor?"):
-            try:
-                conn = connect_db()
-                if conn:
-                    cursor = conn.cursor()
-                    cursor.execute("DELETE FROM Doctor WHERE doctor_id = ?", (doctor_id,))
-                    conn.commit()
-                    messagebox.showinfo("Success", "Doctor deleted successfully!")
-                    self.load_doctors()
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to delete doctor: {e}")
-            finally:
-                if conn:
-                    cursor.close()
-                    conn.close()
-    
+
     def show_staff_management(self):
         self.clear_content()
         
@@ -538,40 +523,45 @@ class AdminModule:
                 columns = ["ID", "First Name", "Last Name", "Role", "Shift", "Contact", "Department", "Actions"]
                 widths = [50, 100, 100, 120, 80, 120, 120, 120]
                 
-                header_frame = ctk.CTkFrame(self.staff_table_scroll, fg_color="#1f538d")
-                header_frame.pack(fill="x", padx=5, pady=(5,0))
+                # Create main table frame
+                table_frame = ctk.CTkFrame(self.staff_table_scroll)
+                table_frame.pack(fill="both", expand=True, padx=5, pady=5)
                 
-                for i, (col, width) in enumerate(zip(columns, widths)):
-                    header_frame.grid_columnconfigure(i, minsize=width)
-                    ctk.CTkLabel(header_frame, text=col, font=ctk.CTkFont(weight="bold"),
-                                text_color="white").grid(row=0, column=i, padx=5, pady=5, sticky="ew")
-                
-                # Create content frame
-                content_frame = ctk.CTkFrame(self.staff_table_scroll)
-                content_frame.pack(fill="both", expand=True, padx=5, pady=(0,5))
-                
+                # Configure grid columns with minimum widths
                 for i, width in enumerate(widths):
-                    content_frame.grid_columnconfigure(i, minsize=width)
+                    table_frame.grid_columnconfigure(i, minsize=width)
                 
-                # Add rows
-                for row_idx, staff in enumerate(staff_members):
+                # Create header row
+                header_frame = ctk.CTkFrame(table_frame, fg_color="#1f538d")
+                header_frame.grid(row=0, column=0, columnspan=len(columns), sticky="ew", padx=5, pady=(5,0))
+                
+                # Configure header columns
+                for i, width in enumerate(widths):
+                    header_frame.grid_columnconfigure(i, minsize=width)
+                
+                # Add header labels
+                for i, (col, width) in enumerate(zip(columns, widths)):
+                    label = ctk.CTkLabel(header_frame, text=col, font=ctk.CTkFont(weight="bold"),
+                                       text_color="white", width=width-10)
+                    label.grid(row=0, column=i, padx=5, pady=5, sticky="ew")
+                
+                # Add data rows
+                for row_idx, staff in enumerate(staff_members, 1):
                     values = [str(staff[0]), staff[1], staff[2], staff[3], staff[4], 
                              staff[5] or "N/A", staff[6] or "N/A"]
                     
                     for col_idx, (value, width) in enumerate(zip(values, widths[:-1])):
-                        ctk.CTkLabel(content_frame, text=value).grid(
-                            row=row_idx, column=col_idx, padx=5, pady=2, sticky="w"
-                        )
+                        label = ctk.CTkLabel(table_frame, text=value, width=width-10)
+                        label.grid(row=row_idx, column=col_idx, padx=5, pady=2, sticky="ew")
                     
                     # Action buttons
-                    actions_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-                    actions_frame.grid(row=row_idx, column=len(columns)-1, padx=5, pady=2)
+                    actions_frame = ctk.CTkFrame(table_frame, fg_color="transparent")
+                    actions_frame.grid(row=row_idx, column=len(columns)-1, padx=5, pady=2, sticky="ew")
+                    actions_frame.grid_columnconfigure(0, weight=1)
+                    actions_frame.grid_columnconfigure(1, weight=1)
                     
                     ctk.CTkButton(actions_frame, text="✏️", width=30, height=24,
-                                 command=lambda s=staff: self.edit_staff(s)).pack(side="left", padx=2)
-                    ctk.CTkButton(actions_frame, text="🗑️", width=30, height=24,
-                                 command=lambda s=staff: self.delete_staff(s[0])).pack(side="left", padx=2)
-                
+                                 command=lambda s=staff: self.edit_staff(s)).grid(row=0, column=0, padx=2)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load staff: {e}")
         finally:
@@ -580,11 +570,11 @@ class AdminModule:
                 conn.close()
     
     def edit_staff(self, staff):
-        # Create edit dialog
         dialog = ctk.CTkToplevel(self.main_frame)
         dialog.title("Edit Staff")
-        dialog.geometry("400x500")
-        
+        dialog.geometry("400x600")
+        scroll_frame = ctk.CTkScrollableFrame(dialog)
+        scroll_frame.pack(fill="both", expand=True, padx=20, pady=20)
         fields = [
             ("First Name:", staff[1]),
             ("Last Name:", staff[2]),
@@ -593,37 +583,33 @@ class AdminModule:
             ("Contact:", staff[5] or ""),
             ("Department:", staff[6] if len(staff) > 6 else "")
         ]
-        
         entries = {}
         for i, (label, value) in enumerate(fields):
-            ctk.CTkLabel(dialog, text=label).pack(pady=(10, 5))
+            ctk.CTkLabel(scroll_frame, text=label).pack(pady=(10, 5))
             if label == "Shift:":
-                entry = ctk.CTkOptionMenu(dialog, values=["Morning", "Evening", "Night"], width=300)
+                entry = ctk.CTkOptionMenu(scroll_frame, values=["Morning", "Evening", "Night"], width=300)
                 entry.set(value)
             elif label == "Department:":
                 from db_connect import get_departments
                 departments = get_departments()
                 dept_names = [f"{d[0]} - {d[1]}" for d in departments]
-                entry = ctk.CTkOptionMenu(dialog, values=dept_names, width=300)
+                entry = ctk.CTkOptionMenu(scroll_frame, values=dept_names, width=300)
                 if value:
                     entry.set(value)
                 else:
                     entry.set(dept_names[0] if dept_names else "")
             else:
-                entry = ctk.CTkEntry(dialog, width=300)
+                entry = ctk.CTkEntry(scroll_frame, width=300)
                 entry.insert(0, value)
             entry.pack(pady=(0, 10))
             entries[label] = entry
-        
         def update_staff():
             try:
                 conn = connect_db()
                 if conn:
                     cursor = conn.cursor()
-                    # Get department_id from dropdown
                     dept_val = entries["Department:"].get()
                     dept_id = dept_val.split(" - ")[0] if dept_val else None
-                    # Check if department exists
                     cursor.execute("SELECT 1 FROM Department WHERE department_id = ?", (dept_id,))
                     if not cursor.fetchone():
                         messagebox.showerror("Error", f"Department ID '{dept_id}' does not exist. Please add the department first.")
@@ -650,25 +636,7 @@ class AdminModule:
                 if conn:
                     cursor.close()
                     conn.close()
-        
-        ctk.CTkButton(dialog, text="Update", command=update_staff).pack(pady=20)
-    
-    def delete_staff(self, staff_id):
-        if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this staff member?"):
-            try:
-                conn = connect_db()
-                if conn:
-                    cursor = conn.cursor()
-                    cursor.execute("DELETE FROM Staff WHERE staff_id = ?", (staff_id,))
-                    conn.commit()
-                    messagebox.showinfo("Success", "Staff deleted successfully!")
-                    self.load_staff()
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to delete staff: {e}")
-            finally:
-                if conn:
-                    cursor.close()
-                    conn.close()
+        ctk.CTkButton(scroll_frame, text="Update", command=update_staff).pack(pady=20)
     
     def show_medical_records(self):
         self.clear_content()
@@ -765,23 +733,30 @@ class AdminModule:
                 columns = ["Record ID", "Patient ID", "Patient Name", "Doctor ID", "Doctor Name", "Visit Date", "Diagnosis", "Notes"]
                 widths = [80, 80, 150, 80, 150, 100, 200, 200]
                 
-                header_frame = ctk.CTkFrame(self.records_table_scroll, fg_color="#1f538d")
-                header_frame.pack(fill="x", padx=5, pady=(5,0))
+                # Create main table frame
+                table_frame = ctk.CTkFrame(self.records_table_scroll)
+                table_frame.pack(fill="both", expand=True, padx=5, pady=5)
                 
-                for i, (col, width) in enumerate(zip(columns, widths)):
-                    header_frame.grid_columnconfigure(i, minsize=width)
-                    ctk.CTkLabel(header_frame, text=col, font=ctk.CTkFont(weight="bold"),
-                                text_color="white").grid(row=0, column=i, padx=5, pady=5, sticky="ew")
-                
-                # Create content frame
-                content_frame = ctk.CTkFrame(self.records_table_scroll)
-                content_frame.pack(fill="both", expand=True, padx=5, pady=(0,5))
-                
+                # Configure grid columns with minimum widths
                 for i, width in enumerate(widths):
-                    content_frame.grid_columnconfigure(i, minsize=width)
+                    table_frame.grid_columnconfigure(i, minsize=width)
                 
-                # Add rows
-                for row_idx, record in enumerate(records):
+                # Create header row
+                header_frame = ctk.CTkFrame(table_frame, fg_color="#1f538d")
+                header_frame.grid(row=0, column=0, columnspan=len(columns), sticky="ew", padx=5, pady=(5,0))
+                
+                # Configure header columns
+                for i, width in enumerate(widths):
+                    header_frame.grid_columnconfigure(i, minsize=width)
+                
+                # Add header labels
+                for i, (col, width) in enumerate(zip(columns, widths)):
+                    label = ctk.CTkLabel(header_frame, text=col, font=ctk.CTkFont(weight="bold"),
+                                       text_color="white", width=width-10)
+                    label.grid(row=0, column=i, padx=5, pady=5, sticky="ew")
+                
+                # Add data rows
+                for row_idx, record in enumerate(records, 1):
                     values = [
                         str(record[0]), str(record[1]), record[2], str(record[3]),
                         record[4], str(record[5]), record[6][:50] + "..." if len(record[6]) > 50 else record[6],
@@ -789,14 +764,8 @@ class AdminModule:
                     ]
                     
                     for col_idx, (value, width) in enumerate(zip(values, widths)):
-                        label = ctk.CTkLabel(content_frame, text=value, wraplength=width-10)
-                        label.grid(row=row_idx, column=col_idx, padx=5, pady=2, sticky="w")
-                
-                # Add message if no records found
-                if not records:
-                    no_records_label = ctk.CTkLabel(content_frame, text="No medical records found", 
-                                                   font=ctk.CTkFont(size=14, weight="bold"))
-                    no_records_label.grid(row=0, column=0, columnspan=len(columns), pady=50)
+                        label = ctk.CTkLabel(table_frame, text=value, width=width-10, wraplength=width-10)
+                        label.grid(row=row_idx, column=col_idx, padx=5, pady=2, sticky="ew")
                 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load medical records: {e}")
@@ -929,38 +898,44 @@ class AdminModule:
                 columns = ["Room Number", "Room Type", "Bed Count", "Actions"]
                 widths = [100, 100, 100, 120]
                 
-                header_frame = ctk.CTkFrame(self.room_table_scroll, fg_color="#1f538d")
-                header_frame.pack(fill="x", padx=5, pady=(5,0))
+                # Create main table frame
+                table_frame = ctk.CTkFrame(self.room_table_scroll)
+                table_frame.pack(fill="both", expand=True, padx=5, pady=5)
                 
-                for i, (col, width) in enumerate(zip(columns, widths)):
-                    header_frame.grid_columnconfigure(i, minsize=width)
-                    ctk.CTkLabel(header_frame, text=col, font=ctk.CTkFont(weight="bold"),
-                                text_color="white").grid(row=0, column=i, padx=5, pady=5, sticky="ew")
-                
-                # Create content frame
-                content_frame = ctk.CTkFrame(self.room_table_scroll)
-                content_frame.pack(fill="both", expand=True, padx=5, pady=(0,5))
-                
+                # Configure grid columns with minimum widths
                 for i, width in enumerate(widths):
-                    content_frame.grid_columnconfigure(i, minsize=width)
+                    table_frame.grid_columnconfigure(i, minsize=width)
                 
-                # Add rows
-                for row_idx, room in enumerate(rooms):
+                # Create header row
+                header_frame = ctk.CTkFrame(table_frame, fg_color="#1f538d")
+                header_frame.grid(row=0, column=0, columnspan=len(columns), sticky="ew", padx=5, pady=(5,0))
+                
+                # Configure header columns
+                for i, width in enumerate(widths):
+                    header_frame.grid_columnconfigure(i, minsize=width)
+                
+                # Add header labels
+                for i, (col, width) in enumerate(zip(columns, widths)):
+                    label = ctk.CTkLabel(header_frame, text=col, font=ctk.CTkFont(weight="bold"),
+                                       text_color="white", width=width-10)
+                    label.grid(row=0, column=i, padx=5, pady=5, sticky="ew")
+                
+                # Add data rows
+                for row_idx, room in enumerate(rooms, 1):
                     values = [str(room[0]), room[1], str(room[2])]
                     
                     for col_idx, (value, width) in enumerate(zip(values, widths[:-1])):
-                        ctk.CTkLabel(content_frame, text=value).grid(
-                            row=row_idx, column=col_idx, padx=5, pady=2, sticky="w"
-                        )
+                        label = ctk.CTkLabel(table_frame, text=value, width=width-10)
+                        label.grid(row=row_idx, column=col_idx, padx=5, pady=2, sticky="ew")
                     
                     # Action buttons
-                    actions_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-                    actions_frame.grid(row=row_idx, column=len(columns)-1, padx=5, pady=2)
+                    actions_frame = ctk.CTkFrame(table_frame, fg_color="transparent")
+                    actions_frame.grid(row=row_idx, column=len(columns)-1, padx=5, pady=2, sticky="ew")
+                    actions_frame.grid_columnconfigure(0, weight=1)
+                    actions_frame.grid_columnconfigure(1, weight=1)
                     
                     ctk.CTkButton(actions_frame, text="✏️", width=30, height=24,
-                                 command=lambda r=room: self.edit_room(r)).pack(side="left", padx=2)
-                    ctk.CTkButton(actions_frame, text="🗑️", width=30, height=24,
-                                 command=lambda r=room: self.delete_room(r[0])).pack(side="left", padx=2)
+                                 command=lambda r=room: self.edit_room(r)).grid(row=0, column=0, padx=2)
                 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load rooms: {e}")
@@ -970,29 +945,23 @@ class AdminModule:
                 conn.close()
     
     def edit_room(self, room):
-        # Create edit dialog
         dialog = ctk.CTkToplevel(self.main_frame)
         dialog.title("Edit Room")
         dialog.geometry("400x500")
-        
+        scroll_frame = ctk.CTkScrollableFrame(dialog)
+        scroll_frame.pack(fill="both", expand=True, padx=20, pady=20)
         fields = [
             ("Room Number:", room[0]),
             ("Room Type:", room[1]),
             ("Bed Count:", room[2]),
         ]
-        
         entries = {}
         for i, (label, value) in enumerate(fields):
-            ctk.CTkLabel(dialog, text=label).pack(pady=(10, 5))
-            if label == "Room Type:":
-                entry = ctk.CTkOptionMenu(dialog, values=["General", "ICU", "Private", "Emergency"], width=300)
-                entry.set(value)
-            else:
-                entry = ctk.CTkEntry(dialog, width=300)
-                entry.insert(0, value)
+            ctk.CTkLabel(scroll_frame, text=label).pack(pady=(10, 5))
+            entry = ctk.CTkEntry(scroll_frame, width=300)
+            entry.insert(0, value)
             entry.pack(pady=(0, 10))
             entries[label] = entry
-        
         def update_room():
             try:
                 conn = connect_db()
@@ -1017,26 +986,9 @@ class AdminModule:
                 if conn:
                     cursor.close()
                     conn.close()
-        
-        ctk.CTkButton(dialog, text="Update", command=update_room).pack(pady=20)
+        ctk.CTkButton(scroll_frame, text="Update", command=update_room).pack(pady=20)
     
-    def delete_room(self, room_number):
-        if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this room?"):
-            try:
-                conn = connect_db()
-                if conn:
-                    cursor = conn.cursor()
-                    cursor.execute("DELETE FROM Room WHERE room_number = ?", (room_number,))
-                    conn.commit()
-                    messagebox.showinfo("Success", "Room deleted successfully!")
-                    self.load_rooms()
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to delete room: {e}")
-            finally:
-                if conn:
-                    cursor.close()
-                    conn.close()
-    
+
     def show_bed_management(self):
         self.clear_content()
         
@@ -1160,39 +1112,46 @@ class AdminModule:
                 columns = ["Room Number", "Room Number", "Bed Number", "Status", "Actions"]
                 widths = [100, 100, 100, 80, 120]
                 
-                header_frame = ctk.CTkFrame(self.bed_table_scroll, fg_color="#1f538d")
-                header_frame.pack(fill="x", padx=5, pady=(5,0))
+                # Create main table frame
+                table_frame = ctk.CTkFrame(self.bed_table_scroll)
+                table_frame.pack(fill="both", expand=True, padx=5, pady=5)
                 
-                for i, (col, width) in enumerate(zip(columns, widths)):
-                    header_frame.grid_columnconfigure(i, minsize=width)
-                    ctk.CTkLabel(header_frame, text=col, font=ctk.CTkFont(weight="bold"),
-                                text_color="white").grid(row=0, column=i, padx=5, pady=5, sticky="ew")
-                
-                # Create content frame
-                content_frame = ctk.CTkFrame(self.bed_table_scroll)
-                content_frame.pack(fill="both", expand=True, padx=5, pady=(0,5))
-                
+                # Configure grid columns with minimum widths
                 for i, width in enumerate(widths):
-                    content_frame.grid_columnconfigure(i, minsize=width)
+                    table_frame.grid_columnconfigure(i, minsize=width)
                 
-                # Add rows
-                for row_idx, bed in enumerate(beds):
-                    status = "Occupied" if bed[3] else "Available"
-                    values = [str(bed[0]), str(bed[1]), bed[2] or "N/A", status]
+                # Create header row
+                header_frame = ctk.CTkFrame(table_frame, fg_color="#1f538d")
+                header_frame.grid(row=0, column=0, columnspan=len(columns), sticky="ew", padx=5, pady=(5,0))
+                
+                # Configure header columns
+                for i, width in enumerate(widths):
+                    header_frame.grid_columnconfigure(i, minsize=width)
+                
+                # Add header labels
+                for i, (col, width) in enumerate(zip(columns, widths)):
+                    label = ctk.CTkLabel(header_frame, text=col, font=ctk.CTkFont(weight="bold"),
+                                       text_color="white", width=width-10)
+                    label.grid(row=0, column=i, padx=5, pady=5, sticky="ew")
+                
+                # Add data rows
+                for row_idx, bed in enumerate(beds, 1):
+                    values = [str(bed[0]), str(bed[1]), str(bed[2]), "Occupied" if bed[3] else "Available"]
                     
                     for col_idx, (value, width) in enumerate(zip(values, widths[:-1])):
-                        ctk.CTkLabel(content_frame, text=value).grid(
-                            row=row_idx, column=col_idx, padx=5, pady=2, sticky="w"
-                        )
+                        label = ctk.CTkLabel(table_frame, text=value, width=width-10)
+                        label.grid(row=row_idx, column=col_idx, padx=5, pady=2, sticky="ew")
                     
                     # Action buttons
-                    actions_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-                    actions_frame.grid(row=row_idx, column=len(columns)-1, padx=5, pady=2)
+                    actions_frame = ctk.CTkFrame(table_frame, fg_color="transparent")
+                    actions_frame.grid(row=row_idx, column=len(columns)-1, padx=5, pady=2, sticky="ew")
+                    actions_frame.grid_columnconfigure(0, weight=1)
+                    actions_frame.grid_columnconfigure(1, weight=1)
                     
                     ctk.CTkButton(actions_frame, text="✏️", width=30, height=24,
-                                 command=lambda b=bed: self.edit_bed(b)).pack(side="left", padx=2)
+                                 command=lambda b=bed: self.edit_bed(b)).grid(row=0, column=0, padx=2)
                     ctk.CTkButton(actions_frame, text="🗑️", width=30, height=24,
-                                 command=lambda b=bed: self.delete_bed(b[0])).pack(side="left", padx=2)
+                                 command=lambda id=(bed[0], bed[2]): self.delete_bed(id)).grid(row=0, column=1, padx=2)
                 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load beds: {e}")
@@ -1202,34 +1161,27 @@ class AdminModule:
                 conn.close()
     
     def edit_bed(self, bed):
-        # Create edit dialog
         dialog = ctk.CTkToplevel(self.main_frame)
         dialog.title("Edit Bed")
         dialog.geometry("400x300")
-        
+        scroll_frame = ctk.CTkScrollableFrame(dialog)
+        scroll_frame.pack(fill="both", expand=True, padx=20, pady=20)
         fields = [
             ("Room Number:", bed[0]),
             ("Bed Number:", bed[2]),
         ]
-        
         entries = {}
         for i, (label, value) in enumerate(fields):
-            ctk.CTkLabel(dialog, text=label).pack(pady=(10, 5))
-            entry = ctk.CTkEntry(dialog, width=300)
+            ctk.CTkLabel(scroll_frame, text=label).pack(pady=(10, 5))
+            entry = ctk.CTkEntry(scroll_frame, width=300)
             entry.insert(0, str(value))
             entry.pack(pady=(0, 10))
             entries[label] = entry
-        
         def update_bed():
             try:
                 conn = connect_db()
                 if conn:
                     cursor = conn.cursor()
-                    # Check if room exists
-                    cursor.execute("SELECT 1 FROM Room WHERE room_number = ?", (entries["Room Number:"].get(),))
-                    if not cursor.fetchone():
-                        messagebox.showerror("Error", f"Room '{entries['Room Number:'].get()}' does not exist. Please add the room first.")
-                        return
                     cursor.execute("""
                         UPDATE Bed SET room_number=?, bed_number=?
                         WHERE bed_id=?
@@ -1248,8 +1200,7 @@ class AdminModule:
                 if conn:
                     cursor.close()
                     conn.close()
-        
-        ctk.CTkButton(dialog, text="Update", command=update_bed).pack(pady=20)
+        ctk.CTkButton(scroll_frame, text="Update", command=update_bed).pack(pady=20)
     
     def delete_bed(self, bed_id):
         if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this bed?"):
@@ -1271,6 +1222,7 @@ class AdminModule:
     def show_department_management(self):
         self.clear_content()
         
+        # Title
         title = ctk.CTkLabel(self.content_frame, text="🏥 Department Management", 
                             font=ctk.CTkFont(size=28, weight="bold"))
         title.pack(pady=(0, 20))
@@ -1285,96 +1237,94 @@ class AdminModule:
         add_btn.pack(side="left", padx=5)
         
         # Create table frame
-        table_frame = ctk.CTkFrame(self.content_frame)
-        table_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        self.department_table_scroll = ctk.CTkScrollableFrame(self.content_frame)
+        self.department_table_scroll.pack(fill="both", expand=True, padx=20, pady=(0, 20))
         
-        # Create table headers
-        headers = ["ID", "Department Name", "Location", "Actions"]
-        for i, header in enumerate(headers):
-            label = ctk.CTkLabel(table_frame, text=header, 
-                               font=ctk.CTkFont(weight="bold"))
-            label.grid(row=0, column=i, padx=10, pady=10, sticky="w")
+        # Create header
+        columns = ["ID", "Department Name", "Location", "Actions"]
+        widths = [50, 200, 200, 120]
+        
+        # Configure grid columns
+        for i, width in enumerate(widths):
+            self.department_table_scroll.grid_columnconfigure(i, minsize=width)
+        
+        # Create header row
+        header_frame = ctk.CTkFrame(self.department_table_scroll, fg_color="#1f538d")
+        header_frame.grid(row=0, column=0, columnspan=len(columns), sticky="ew", padx=5, pady=(5,0))
+        
+        for i, (col, width) in enumerate(zip(columns, widths)):
+            header_frame.grid_columnconfigure(i, minsize=width)
+            ctk.CTkLabel(header_frame, text=col, font=ctk.CTkFont(weight="bold"),
+                        text_color="white").grid(row=0, column=i, padx=5, pady=5, sticky="ew")
         
         # Load departments
         self.load_departments()
     
-    def add_department(self):
-        # Create add dialog
-        dialog = ctk.CTkToplevel(self.content_frame)
-        dialog.title("Add Department")
-        dialog.geometry("400x300")
-        dialog.grab_set()  # Make dialog modal
-        
-        # Create form
-        ctk.CTkLabel(dialog, text="Department Name:").pack(pady=(20, 5))
-        name_entry = ctk.CTkEntry(dialog, width=300)
-        name_entry.pack(pady=(0, 10))
-        
-        ctk.CTkLabel(dialog, text="Location:").pack(pady=(10, 5))
-        location_entry = ctk.CTkEntry(dialog, width=300)
-        location_entry.pack(pady=(0, 20))
-        
-        def save_department():
-            try:
-                name = name_entry.get().strip()
-                location = location_entry.get().strip()
-                
-                if not name or not location:
-                    messagebox.showerror("Error", "All fields are required!")
-                    return
-                
-                add_department(name, location)
-                messagebox.showinfo("Success", "Department added successfully!")
-                dialog.destroy()
-                self.load_departments()
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to add department: {e}")
-        
-        # Save button
-        save_btn = ctk.CTkButton(dialog, text="Save", command=save_department)
-        save_btn.pack(pady=20)
-    
     def load_departments(self):
         try:
-            departments = get_departments()
+            # Clear existing content
+            for widget in self.department_table_scroll.winfo_children():
+                widget.destroy()
             
-            # Clear existing rows
-            for widget in self.content_frame.winfo_children():
-                if isinstance(widget, ctk.CTkFrame):
-                    for child in widget.winfo_children():
-                        if isinstance(child, ctk.CTkFrame):
-                            child.destroy()
-            
-            # Add departments to table
-            for i, dept in enumerate(departments, 1):
-                dept_id, name, location = dept
+            conn = connect_db()
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM Department")
+                departments = cursor.fetchall()
                 
-                # Create row frame
-                row_frame = ctk.CTkFrame(self.content_frame)
-                row_frame.pack(fill="x", padx=20, pady=5)
+                # Create header
+                columns = ["Department ID", "Name", "Description", "Actions"]
+                widths = [100, 150, 200, 120]
                 
-                # Department info
-                ctk.CTkLabel(row_frame, text=str(dept_id)).pack(side="left", padx=10)
-                ctk.CTkLabel(row_frame, text=name).pack(side="left", padx=10)
-                ctk.CTkLabel(row_frame, text=location).pack(side="left", padx=10)
+                # Create main table frame
+                table_frame = ctk.CTkFrame(self.department_table_scroll)
+                table_frame.pack(fill="both", expand=True, padx=5, pady=5)
                 
-                # Action buttons
-                actions_frame = ctk.CTkFrame(row_frame, fg_color="transparent")
-                actions_frame.pack(side="right", padx=10)
+                # Configure grid columns with minimum widths
+                for i, width in enumerate(widths):
+                    table_frame.grid_columnconfigure(i, minsize=width)
                 
-                edit_btn = ctk.CTkButton(actions_frame, text="✏️ Edit", 
-                                       command=lambda d=dept: self.edit_department(d))
-                edit_btn.pack(side="left", padx=5)
+                # Create header row
+                header_frame = ctk.CTkFrame(table_frame, fg_color="#1f538d")
+                header_frame.grid(row=0, column=0, columnspan=len(columns), sticky="ew", padx=5, pady=(5,0))
                 
-                delete_btn = ctk.CTkButton(actions_frame, text="🗑️ Delete", 
-                                         command=lambda id=dept_id: self.delete_department(id))
-                delete_btn.pack(side="left", padx=5)
-        
+                # Configure header columns
+                for i, width in enumerate(widths):
+                    header_frame.grid_columnconfigure(i, minsize=width)
+                
+                # Add header labels
+                for i, (col, width) in enumerate(zip(columns, widths)):
+                    label = ctk.CTkLabel(header_frame, text=col, font=ctk.CTkFont(weight="bold"),
+                                       text_color="white", width=width-10)
+                    label.grid(row=0, column=i, padx=5, pady=5, sticky="ew")
+                
+                # Add data rows
+                for row_idx, dept in enumerate(departments, 1):
+                    values = [str(dept[0]), dept[1], dept[2] if dept[2] else ""]
+                    
+                    for col_idx, (value, width) in enumerate(zip(values, widths[:-1])):
+                        label = ctk.CTkLabel(table_frame, text=value, width=width-10)
+                        label.grid(row=row_idx, column=col_idx, padx=5, pady=2, sticky="ew")
+                    
+                    # Action buttons
+                    actions_frame = ctk.CTkFrame(table_frame, fg_color="transparent")
+                    actions_frame.grid(row=row_idx, column=len(columns)-1, padx=5, pady=2, sticky="ew")
+                    actions_frame.grid_columnconfigure(0, weight=1)
+                    actions_frame.grid_columnconfigure(1, weight=1)
+                    
+                    ctk.CTkButton(actions_frame, text="✏️", width=30, height=24,
+                                 command=lambda d=dept: self.edit_department(d)).grid(row=0, column=0, padx=2)
+                    ctk.CTkButton(actions_frame, text="🗑️", width=30, height=24,
+                                 command=lambda id=dept[0]: self.delete_department(id)).grid(row=0, column=1, padx=2)
+                
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load departments: {e}")
+        finally:
+            if conn:
+                cursor.close()
+                conn.close()
     
     def edit_department(self, department):
-        # Create edit dialog
         dialog = ctk.CTkToplevel(self.content_frame)
         dialog.title("Edit Department")
         dialog.geometry("400x300")
@@ -1532,4 +1482,36 @@ class AdminModule:
             else:
                 messagebox.showinfo("No Data", "No statistics available for this department.")
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to load department statistics: {e}") 
+            messagebox.showerror("Error", f"Failed to load department statistics: {e}")
+
+    def add_department(self):
+        dialog = ctk.CTkToplevel(self.content_frame)
+        dialog.title("Add Department")
+        dialog.geometry("400x250")
+        dialog.grab_set()
+
+        ctk.CTkLabel(dialog, text="Department Name:").pack(pady=(20, 5))
+        name_entry = ctk.CTkEntry(dialog, width=300)
+        name_entry.pack(pady=(0, 10))
+
+        ctk.CTkLabel(dialog, text="Location:").pack(pady=(10, 5))
+        location_entry = ctk.CTkEntry(dialog, width=300)
+        location_entry.pack(pady=(0, 20))
+
+        def save_department():
+            name = name_entry.get().strip()
+            location = location_entry.get().strip()
+            if not name or not location:
+                messagebox.showerror("Error", "All fields are required!")
+                return
+            try:
+                from db_connect import add_department
+                add_department(name, location)
+                messagebox.showinfo("Success", "Department added successfully!")
+                dialog.destroy()
+                self.load_departments()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to add department: {e}")
+
+        save_btn = ctk.CTkButton(dialog, text="Save", command=save_department)
+        save_btn.pack(pady=10) 

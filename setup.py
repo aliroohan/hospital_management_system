@@ -12,7 +12,8 @@ def install_dependencies():
     packages = [
         'customtkinter',
         'pyodbc',
-        'CTkTable'
+        'CTkTable',
+        'tkcalendar'
     ]
     
     print("🏥 Hospital Management System Setup")
