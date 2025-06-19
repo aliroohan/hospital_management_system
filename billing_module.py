@@ -33,6 +33,7 @@ class BillingModule:
         
         # Setup content for each tab
         self.setup_bill_generation(self.tabview.tab("Generate Bill"))
+        self.setup_bill_items(self.tabview.tab("Generate Bill"))
         self.setup_bill_viewing(self.tabview.tab("View Bills"))
         
         # Load initial data

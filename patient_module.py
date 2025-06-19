@@ -98,7 +98,6 @@ class PatientModule:
             patients = []
         stats = [
             ("👥 Total Patients", len(patients), "#3498db"),
-            ("🆕 New Today", sum(1 for p in patients if p[3].strftime('%Y-%m-%d') == datetime.now().strftime('%Y-%m-%d')), "#27ae60")
         ]
         num_stats = len(stats)
         for col in range(num_stats):
